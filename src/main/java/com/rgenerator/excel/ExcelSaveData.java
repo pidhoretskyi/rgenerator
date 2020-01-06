@@ -4,9 +4,12 @@ import java.sql.DriverManager;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 
 import com.ibm.db2.jcc.am.Connection;
 import com.ibm.db2.jcc.am.ResultSet;
+import com.rgenerator.db.DbConnProvider;
+import com.rgenerator.db.DbDataProvider;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
@@ -49,7 +52,7 @@ public class ExcelSaveData {
 				cell.setCellValue(data.getColumnName(i));
 				cell.setCellStyle(headerCellStyle);
 			}
-		
+		  
 			while(ACCdata.next()) {
 				row = sheet.createRow(currentRow++);
 				for(int i=1; i<=columnCount; i++) {
@@ -73,11 +76,103 @@ public class ExcelSaveData {
         
 	}
 	
-	public void SaveHierarchy() {
+	public void SaveHierarchy(String account) {
+		DbConnProvider server = new DbConnProvider();
+		Connection connection = server.openConn();
+		DbDataProvider dataProvider = new DbDataProvider(connection);
+		System.err.println("**** Saving hierarchy");
+		if(connection != null) {
+			try {
+				ResultSet hier = dataProvider.GetHierarchy(account);
+				Workbook workbook = new HSSFWorkbook();
+				while(hier.next()) {
+					if(workbook.getSheet(hier.getString(1))!=null) continue;
+					ResultSet acc = dataProvider.MonthEntriesData(hier.getString(1));
+					SaveACC(workbook, acc, hier.getString(1));
+				}
+				FileOutputStream fileOut = new FileOutputStream(account+"_"+LocalDate.now()+".xls");
+				workbook.write(fileOut);
+				fileOut.close();
+			}catch(IOException ex) {
+	        	System.err.println("IOException information");
+	        	while (ex != null) {
+					System.err.println("Error msg: " + ex.getMessage());
+					
+				}
+			}catch (SQLException ex) {
+				System.err.println("SQLException information");
+				while (ex != null) {
+					System.err.println("Error msg: " + ex.getMessage());
+					System.err.println("SQLSTATE: " + ex.getSQLState());
+					System.err.println("Error code: " + ex.getErrorCode());
+					ex.printStackTrace();
+					ex = ex.getNextException(); // For drivers that support chained exceptions
+				}
+			}
+		}
+		
+		
+		
+	}
+	
+	public void DailyEnries(String date) {
+		DbConnProvider server = new DbConnProvider();
+		Connection connection = server.openConn();
+		DbDataProvider dataProvider = new DbDataProvider(connection);
+		System.out.println("**** 1");
+		
+		if(connection != null) {
+			
+			try {
+				
+				ResultSet acc = dataProvider.DailyEntriesACC(date);
+				Workbook workbook = new HSSFWorkbook();
+				FileOutputStream fileOut=null;
+				int prevACChier = -1;
+				
+				while(acc.next()) {
+					if(workbook.getSheet(acc.getString(2))!=null) continue;
+					if(prevACChier==acc.getInt(1)) { //write data to the same hierarchy
+						ResultSet AccData = dataProvider.DailyEntriesData(acc.getString(2));
+						SaveACC(workbook, AccData, acc.getString(2));
+						prevACChier=acc.getInt(1);
+						System.out.println("**** Working");
+					}else { //create new file for other hierarchy
+						if(workbook.getNumberOfSheets()!=0) {
+						fileOut = new FileOutputStream(workbook.getSheetName(0)+"_"+date+".xls");
+						workbook.write(fileOut);
+						fileOut.close();
+						}
+					
+						workbook = new HSSFWorkbook();
+						ResultSet AccData = dataProvider.DailyEntriesData(acc.getString(2));
+						SaveACC(workbook, AccData, acc.getString(2));
+						prevACChier=acc.getInt(1);
+						System.out.println("**** Working");
+					}
+				}
+			}catch(IOException ex) {
+	        	System.err.println("IOException information");
+	        	while (ex != null) {
+					System.err.println("Error msg: " + ex.getMessage());
+					
+				}
+			}catch (SQLException ex) {
+				System.err.println("SQLException information");
+				while (ex != null) {
+					System.err.println("Error msg: " + ex.getMessage());
+					System.err.println("SQLSTATE: " + ex.getSQLState());
+					System.err.println("Error code: " + ex.getErrorCode());
+					ex.printStackTrace();
+					ex = ex.getNextException(); // For drivers that support chained exceptions
+				}
+			}
+		}
+		}
 		
 	}
 	
 	
 	
 
-}
+

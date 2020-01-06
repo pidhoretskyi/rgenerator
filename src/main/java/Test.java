@@ -16,40 +16,10 @@ import com.rgenerator.excel.ExcelSaveData;
 public class Test {
 	
 	public static void main(String[] args) {
-		DbConnProvider server = new DbConnProvider();
-		Connection connection = server.openConn();
-		DbDataProvider dataProvider = new DbDataProvider(connection);
-		LocalDate date = LocalDate.now();
-		
-		if(connection!=null) {
-			try {
-			ExcelSaveData ex = new ExcelSaveData();
-			Workbook workbook = new HSSFWorkbook();
-			ex.SaveACC(workbook, dataProvider.DailyEntriesData("LT542140030002190972"), "LT542140030002190972");
-			FileOutputStream fileOut = new FileOutputStream("Hierarchy "+date+" (Daily).xls");
-	        workbook.write(fileOut);
-	        fileOut.close();
-	        workbook.close();
-	        
-	        ex = new ExcelSaveData();
-			workbook = new HSSFWorkbook();
-			ex.SaveACC(workbook, dataProvider.MonthEntriesData("LT542140030002190972"), "LT542140030002190972");
-			fileOut = new FileOutputStream("Hierarchy "+date+"(Monthly).xls");
-	        workbook.write(fileOut);
-	        fileOut.close();
-	        workbook.close();
-
-	        }catch(IOException ex) {
-	        	System.err.println("IOException information");
-	        	while (ex != null) {
-					System.err.println("Error msg: " + ex.getMessage());
-					
-				}
-	        }
-			
+		ExcelSaveData ex = new ExcelSaveData();
+		ex.DailyEnries("2020-01-06");	
+		ex.SaveHierarchy("LT542140030002190972");
 		}
-		
-
-	}
-
 }
+
+
