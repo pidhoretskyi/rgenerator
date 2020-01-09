@@ -38,6 +38,11 @@ public class DbDataProvider {
 		
 	}
 	
+	public ResultSet getAccountNumberForDailyReport(String accountID) {
+		return DataProvider("SELECT a.ACC_NAME, a.ACC_NUMBER FROM ACCT.ACCOUNT a\r\n" + 
+				"WHERE a.ACC_ID = "+accountID);
+	} 
+	
 	public ResultSet DailyEntriesData(String account) {
 		return DataProvider("SELECT * FROM ACCT.ACCOUNT_RESULT_DETAILS\r\n" +
 				"WHERE ACC_ID = " +account+"\r\n" +

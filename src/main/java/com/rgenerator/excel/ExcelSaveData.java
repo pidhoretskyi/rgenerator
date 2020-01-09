@@ -41,6 +41,7 @@ public class ExcelSaveData {
 			headerFont.setBold(true);
 			headerFont.setFontHeightInPoints((short) 12);
 			headerFont.setColor(IndexedColors.BLUE.getIndex());
+			
 			CellStyle headerCellStyle = workbook.createCellStyle();
 			headerCellStyle.setFont(headerFont);
         
@@ -53,13 +54,18 @@ public class ExcelSaveData {
 				cell.setCellStyle(headerCellStyle);
 			}
 		  
+			boolean isDataExist = false;
 			while(ACCdata.next()) {
+				isDataExist = true;
 				row = sheet.createRow(currentRow++);
 				for(int i=1; i<=columnCount; i++) {
 					row.createCell(i-1).setCellValue(ACCdata.getString(i));
 				}
 			}
-		
+			if(!isDataExist) {
+				workbook.removeSheetAt(workbook.getSheetIndex(sheet));
+				return;
+			}
 			for(int i = 0; i < columnCount; i++) {
 				sheet.autoSizeColumn(i);
 			}
@@ -125,18 +131,23 @@ public class ExcelSaveData {
 			
 			try {
 				
-				ResultSet acc = dataProvider.DailyEntriesACC(date);
+				ResultSet accountsForDailyReport = dataProvider.DailyEntriesACC(date);
 				Workbook workbook = new HSSFWorkbook();
 				FileOutputStream fileOut=null;
 				int prevACChier = -1;
 				
-				while(acc.next()) {
-					if(workbook.getSheet(acc.getString(2))!=null) continue;
-					if(prevACChier==acc.getInt(1)) { //write data to the same hierarchy
-						ResultSet AccData = dataProvider.DailyEntriesData(acc.getString(2));
-						SaveACC(workbook, AccData, acc.getString(2));
-						prevACChier=acc.getInt(1);
-						System.out.println("**** Working");
+				while(accountsForDailyReport.next()) {
+					ResultSet accNumberData = dataProvider.getAccountNumberForDailyReport(accountsForDailyReport.getString(2));
+					
+					accNumberData.next();
+					String accNumber = accNumberData.getString(2);
+					System.out.println("**** "+accNumber);
+					if(accNumber==null) continue;
+					if(workbook.getSheet(accNumber)!=null) continue; // if we already have sheet with current acc name when skip
+					if(prevACChier==accountsForDailyReport.getInt(1)) { //write data to the same hierarchy
+						ResultSet accData = dataProvider.DailyEntriesData(accountsForDailyReport.getString(2));
+						SaveACC(workbook, accData, accNumber);
+						prevACChier=accountsForDailyReport.getInt(1);
 					}else { //create new file for other hierarchy
 						if(workbook.getNumberOfSheets()!=0) {
 						fileOut = new FileOutputStream(workbook.getSheetName(0)+"_"+date+".xls");
@@ -145,10 +156,10 @@ public class ExcelSaveData {
 						}
 					
 						workbook = new HSSFWorkbook();
-						ResultSet AccData = dataProvider.DailyEntriesData(acc.getString(2));
-						SaveACC(workbook, AccData, acc.getString(2));
-						prevACChier=acc.getInt(1);
-						System.out.println("**** Working");
+						ResultSet AccData = dataProvider.DailyEntriesData(accountsForDailyReport.getString(2));
+						SaveACC(workbook, AccData, accNumber);
+						prevACChier=accountsForDailyReport.getInt(1);
+						//System.out.println("**** Working");
 					}
 				}
 			}catch(IOException ex) {
