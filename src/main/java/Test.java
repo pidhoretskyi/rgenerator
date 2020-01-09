@@ -17,8 +17,8 @@ public class Test {
 	
 	public static void main(String[] args) {
 		ExcelSaveData ex = new ExcelSaveData();
-		ex.DailyEnries("2020-01-06");	
-		ex.SaveHierarchy("LT542140030002190972");
+		ex.DailyEnries(LocalDate.now().toString());	
+		//ex.SaveHierarchy("LT542140030002190972");
 		}
 }
 

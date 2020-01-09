@@ -20,13 +20,17 @@ import java.io.IOException;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 
 public class ExcelSaveData {
+	
 	
 	public void SaveACC(Workbook workbook, ResultSet ACCdata, String ACCname) {
 		try {
@@ -36,14 +40,34 @@ public class ExcelSaveData {
 		
 		
 			Sheet sheet = workbook.createSheet(ACCname);
-			//Header font
+			
+			//Header style
 			Font headerFont = workbook.createFont();
 			headerFont.setBold(true);
 			headerFont.setFontHeightInPoints((short) 12);
-			headerFont.setColor(IndexedColors.BLUE.getIndex());
-			
+			headerFont.setColor(IndexedColors.BLACK.getIndex());
 			CellStyle headerCellStyle = workbook.createCellStyle();
 			headerCellStyle.setFont(headerFont);
+			
+			
+			//Date style
+			CellStyle dateCellStyle = workbook.createCellStyle();
+			CreationHelper createHelper = workbook.getCreationHelper();
+			dateCellStyle.setDataFormat(createHelper.createDataFormat().getFormat("DD.MM.YYYY"));
+			dateCellStyle.setAlignment(HorizontalAlignment.CENTER);
+			dateCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+				
+			//Datestamp style
+			CellStyle datestampCellStyle = workbook.createCellStyle();
+			datestampCellStyle.setDataFormat(createHelper.createDataFormat().getFormat("DD.MM.YYYY HH:mm:ss.000"));
+			datestampCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+			datestampCellStyle.setAlignment(HorizontalAlignment.CENTER);
+			
+			//Text style
+			CellStyle textCellStyle = workbook.createCellStyle();
+			textCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+			textCellStyle.setAlignment(HorizontalAlignment.CENTER);
+			
         
         
 			System.out.println("**** Writing to file");
@@ -59,7 +83,21 @@ public class ExcelSaveData {
 				isDataExist = true;
 				row = sheet.createRow(currentRow++);
 				for(int i=1; i<=columnCount; i++) {
-					row.createCell(i-1).setCellValue(ACCdata.getString(i));
+					Cell cell = row.createCell(i-1);
+					
+					if(data.getColumnType(i)==java.sql.Types.DATE) {
+						cell.setCellStyle(dateCellStyle);
+						cell.setCellValue(ACCdata.getDate(i));
+						
+					}else if(data.getColumnType(i)==java.sql.Types.TIMESTAMP) {
+						cell.setCellStyle(datestampCellStyle);
+						cell.setCellValue(ACCdata.getTimestamp(i));
+						
+						
+					}else {
+						cell.setCellValue(ACCdata.getString(i));
+						cell.setCellStyle(textCellStyle);
+					}
 				}
 			}
 			if(!isDataExist) {
@@ -125,7 +163,7 @@ public class ExcelSaveData {
 		DbConnProvider server = new DbConnProvider();
 		Connection connection = server.openConn();
 		DbDataProvider dataProvider = new DbDataProvider(connection);
-		System.out.println("**** 1");
+		
 		
 		if(connection != null) {
 			
