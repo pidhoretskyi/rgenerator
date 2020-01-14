@@ -28,14 +28,15 @@ public class DbConnProvider {
 		try {
 			// loading DB2 driver
 			Class.forName("com.ibm.db2.jcc.DB2Driver");
-			System.out.println("**** Loaded the JDBC driver");
+			//System.out.println("**** Loaded the JDBC driver");
 			
 			// create connection
 			connection = (Connection) DriverManager.getConnection(URL, USER, PASSWORD);
 
 			// Commit changes manually
 			connection.setAutoCommit(false);
-			System.out.println("**** Created a JDBC connection to the data source");
+			
+			//System.out.println("**** Created a JDBC connection to the data source");
 			
 			
 		} catch (ClassNotFoundException e) {
@@ -58,6 +59,7 @@ public class DbConnProvider {
 	
 	public void endConn(Connection connection) {
 		try {
+			connection.commit();
 			// Connection must be on a unit-of-work boundary to allow close
 			connection.close();
 			
