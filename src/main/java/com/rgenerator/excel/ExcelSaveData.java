@@ -1,24 +1,24 @@
 package com.rgenerator.excel;
 
-import java.sql.DriverManager;
+//import java.sql.DriverManager;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
+//import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
+//import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
+//import java.util.List;
 
 import com.ibm.db2.jcc.am.Connection;
 import com.ibm.db2.jcc.am.ResultSet;
 import com.rgenerator.db.DbConnProvider;
 import com.rgenerator.db.DbDataProvider;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+//import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-import java.io.FileNotFoundException;
+//import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -39,22 +39,22 @@ import org.apache.poi.ss.util.CellRangeAddress;
 
 public class ExcelSaveData {
 
-	MoveFile moveFile;
+	private MoveFile moveFile;
 	private String directoryName;
-	SimpleDateFormat dateFormat;
-	DateTimeFormatter formatter;
+	private SimpleDateFormat dateFormat;
+	private DateTimeFormatter formatter;
 
-	DbConnProvider server;
-	Connection connection;
-	DbDataProvider dataProvider;
+	private DbConnProvider server;
+	private Connection connection;
+	private DbDataProvider dataProvider;
 
-	String reportFolderMonthlyName = "MONTHLY";
-	String folderForMonthlyRepotrs;
+	private String reportFolderMonthlyName = "MONTHLY";
+	private String folderForMonthlyRepotrs;
 
-	String reportFolderWeeklyName = "WEEKLY";
-	String folderForWeeklyRepotrs;
-	Workbook workbook;
-	FileOutputStream fileOut;
+	private String reportFolderWeeklyName = "WEEKLY";
+	private String folderForWeeklyRepotrs;
+	private Workbook workbook;
+	private FileOutputStream fileOut;
 
 	public ExcelSaveData() {
 		moveFile = new MoveFile();
@@ -70,8 +70,8 @@ public class ExcelSaveData {
 		fileOut = null;
 	}
 
-	public void saveAccToSheet(Workbook workbook, ResultSet ACCdata, String ACCname, String currency, String reportName,
-			String reportPeriod) {
+	private void saveAccToSheet(Workbook workbook, ResultSet ACCdata, String ACCname, String currency,
+			String reportName, String reportPeriod) {
 		try {
 			ResultSetMetaData data = ACCdata.getMetaData();
 			int columnCount = data.getColumnCount();
@@ -286,7 +286,7 @@ public class ExcelSaveData {
 							ResultSet accCurr = dataProvider.getCurrency(accountsForWeeklyReport.getString(2));
 							accCurr.next();
 
-							saveAccToSheet(workbook, accData, accNumber, accCurr.getString(2),reportName,
+							saveAccToSheet(workbook, accData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForWeeklyReport.getDate(6)) + " - "
 											+ dateFormat.format(accountsForWeeklyReport.getDate(7)));
 
@@ -323,9 +323,8 @@ public class ExcelSaveData {
 							ResultSet accCurr = dataProvider.getCurrency(accountsForWeeklyReport.getString(2));
 							accCurr.next();
 
-							
 							// Save to sheet
-							saveAccToSheet(workbook, AccData, accNumber, accCurr.getString(2),reportName,
+							saveAccToSheet(workbook, AccData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForWeeklyReport.getDate(6)) + " - "
 											+ dateFormat.format(accountsForWeeklyReport.getDate(7)));
 							prevACChier = accountsForWeeklyReport.getInt(1);
@@ -341,7 +340,7 @@ public class ExcelSaveData {
 					try {
 						Thread.sleep(5000);
 					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
+						
 						e.printStackTrace();
 					}
 					continue;
@@ -411,7 +410,7 @@ public class ExcelSaveData {
 							ResultSet accCurr = dataProvider.getCurrency(accountsForMonthlyReport.getString(2));
 							accCurr.next();
 
-							saveAccToSheet(workbook, accData, accNumber, accCurr.getString(2),reportName,
+							saveAccToSheet(workbook, accData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForMonthlyReport.getDate(6)) + " - "
 											+ formatter.format(LocalDate.now()));
 
@@ -450,7 +449,7 @@ public class ExcelSaveData {
 							accCurr.next();
 
 							// Write info to sheet
-							saveAccToSheet(workbook, AccData, accNumber, accCurr.getString(2),reportName,
+							saveAccToSheet(workbook, AccData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForMonthlyReport.getDate(6)) + " - "
 											+ formatter.format(LocalDate.now()));
 
@@ -466,7 +465,7 @@ public class ExcelSaveData {
 					try {
 						Thread.sleep(5000);
 					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
+						
 						e.printStackTrace();
 					}
 					continue;
@@ -491,7 +490,8 @@ public class ExcelSaveData {
 		}
 	}
 
-	private String getMoney(String value, String Currency) { // Convert to Interest Bearing Balance 123456 => 1234,56 EUR
+	private String getMoney(String value, String Currency) { // Convert to Interest Bearing Balance 123456 => 1234,56
+																// EUR
 		StringBuffer buffer = new StringBuffer(value);
 		if (buffer.length() > 2)
 			buffer.insert(value.length() - 2, ",");
@@ -499,7 +499,7 @@ public class ExcelSaveData {
 			buffer.insert(0, "0,");
 		else if (buffer.length() == 1)
 			buffer.insert(0, "0,0");
-		buffer.insert(buffer.length(), " "+Currency);
+		buffer.insert(buffer.length(), " " + Currency);
 		return buffer.toString();
 	}
 
