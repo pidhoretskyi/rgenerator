@@ -45,7 +45,12 @@ public class DbDataProvider {
 				"INNER JOIN ACCT.EDGE e_top ON e_top.HIER_ID = "+hierID+" AND a_top.ACC_ID = e_top.CHILD_ACC_ID AND e_top.PARENT_ACC_ID IS NULL");
 	}
 	
-	public ResultSet getDetailsData(String account) {
+	public ResultSet getCurrency(String account) {
+		return dataProvider("SELECT ACC_ID, CURRENCY_CODE FROM acct.ACCOUNT a2\r\n" + 
+				"WHERE ACC_ID="+account);
+	}
+	
+	public ResultSet getDetailsData(String account, String dateFrom, String dateTo) {
 		return dataProvider("SELECT\r\n" + 
 				"                             ACC_ID AS \"Account number\", \r\n" + 
 				"                                BANK_ID AS \"Bank_ID\",\r\n" + 
@@ -57,7 +62,8 @@ public class DbDataProvider {
 				"                                CALCU_RATE_PERCENT AS \"Total Interest Rate (%)\", \r\n" + 
 				"                                FCOND_NAME AS \"Interest Basis\",\r\n" + 
 				"                                SETTLEMENT_TYPE AS \"Settlement type\"\r\n" + 
-				"                          FROM ACCT.ACCOUNT_RESULT_DETAILS WHERE ACC_ID = "+account+"\r\n" + 
+				"                          FROM ACCT.ACCOUNT_RESULT_DETAILS WHERE ACC_ID = "+account+" AND" +
+				"                          CALCU_TO_DATE BETWEEN date('"+	dateFrom +"') AND date('"+dateTo+"')\r\n"+
 				"                          AND CALCU_TYPE = 'INT'\r\n" + 
 				"ORDER BY CALCU_TO_DATE ASC");
 	}
