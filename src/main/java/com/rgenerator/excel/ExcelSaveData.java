@@ -39,10 +39,37 @@ import org.apache.poi.ss.util.CellRangeAddress;
 
 public class ExcelSaveData {
 
-	MoveFile moveFile = new MoveFile();
-	private String directoryName = moveFile.createDirectory(); 
-	
-	
+	MoveFile moveFile;
+	private String directoryName;
+	SimpleDateFormat dateFormat;
+	DateTimeFormatter formatter;
+
+	DbConnProvider server;
+	Connection connection;
+	DbDataProvider dataProvider;
+
+	String reportFolderMonthlyName = "MONTHLY";
+	String folderForMonthlyRepotrs;
+
+	String reportFolderWeeklyName = "WEEKLY";
+	String folderForWeeklyRepotrs;
+	Workbook workbook;
+	FileOutputStream fileOut;
+
+	public ExcelSaveData() {
+		moveFile = new MoveFile();
+		directoryName = moveFile.createDirectory();
+		folderForMonthlyRepotrs = moveFile.createFolder(reportFolderMonthlyName, directoryName);
+		folderForWeeklyRepotrs = moveFile.createFolder(reportFolderWeeklyName, directoryName);
+
+		dateFormat = new SimpleDateFormat("dd.MM.yyyy");
+		formatter = DateTimeFormatter.ofPattern("dd.MM.YYYY");
+
+		server = new DbConnProvider();
+
+		fileOut = null;
+	}
+
 	public void saveAccToSheet(Workbook workbook, ResultSet ACCdata, String ACCname, String reportName,
 			String reportPeriod) {
 		try {
@@ -116,7 +143,7 @@ public class ExcelSaveData {
 			for (int i = 1; i <= columnCount; i++) {
 				Cell cell = row.createCell(i - 1);
 				cell.setCellValue(data.getColumnLabel(i));
-				
+
 				cell.setCellStyle(headerCellStyle);
 			}
 
@@ -136,7 +163,12 @@ public class ExcelSaveData {
 						cell.setCellValue(ACCdata.getTimestamp(i));
 
 					} else {
-						cell.setCellValue(ACCdata.getString(i));
+						if (i == 7)
+							cell.setCellValue(getMoney(ACCdata.getString(i)));
+						else if(i==8)
+							cell.setCellValue(getRate(ACCdata.getString(i)));
+						else
+							cell.setCellValue(ACCdata.getString(i));
 						cell.setCellStyle(textCellStyle);
 					}
 				}
@@ -196,112 +228,116 @@ public class ExcelSaveData {
 		Connection connection = server.openConn();
 		DbDataProvider dataProvider = new DbDataProvider(connection);
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.YYYY");
-		
+
 		String reportFolderDailyName = "DAILY";
-		String folderForDailyRepotrs = moveFile.createFolder(reportFolderDailyName, directoryName); 
+		String folderForDailyRepotrs = moveFile.createFolder(reportFolderDailyName, directoryName);
 
 		if (connection != null) {
 			ResultSet accountsForDailyReport = dataProvider.dailyEntriesACC(date);
 			getDailyReport(dataProvider, accountsForDailyReport, "Daily",
 					formatter.format(LocalDate.now()) + "-" + formatter.format(LocalDate.now()), folderForDailyRepotrs);
 		}
-		
+
 		server.endConn(connection);
 	}
 
 	public void weeklyEntries(String date) {
 		System.out.println("--------------Weekly-------------");
-		DbConnProvider server = new DbConnProvider();
-		Connection connection = server.openConn();
-		DbDataProvider dataProvider = new DbDataProvider(connection);
 
-		String reportFolderWeeklyName = "WEEKLY";
-		String folderForWeeklyRepotrs = moveFile.createFolder(reportFolderWeeklyName, directoryName); 
-		
-		if (connection != null) {
+		// Folder for reports
+		String reportName = "Weekly";
 
-			ResultSet accountsForWeeklyReport = dataProvider.weeklyEntriesData(date);
-			
-			getScheduledReport(dataProvider, accountsForWeeklyReport, "Weekly", folderForWeeklyRepotrs);
-		}
-		server.endConn(connection);
-	}
-	
-	public void monthlyEntries(String date) {
-		System.out.println("--------------Monthly-------------");
-		DbConnProvider server = new DbConnProvider();
-		Connection connection = server.openConn();
-		DbDataProvider dataProvider = new DbDataProvider(connection);
+		workbook = new HSSFWorkbook();
 
-		String reportFolderMonthlyName = "MONTHLY";
-		String folderForMonthlyRepotrs = moveFile.createFolder(reportFolderMonthlyName, directoryName); 
-		
-		if (connection != null) {
-
-			ResultSet accountsForWeeklyReport = dataProvider.monthlyEntriesData(date);
-			
-			getScheduledReport(dataProvider, accountsForWeeklyReport, "Monthly", folderForMonthlyRepotrs);
-		}
-		
-		server.endConn(connection);
-	}
-	
-	private void getScheduledReport(DbDataProvider dataProvider, ResultSet accountsForReport, String reportName, String filePath) {
-		
-		SimpleDateFormat dateFormat=new SimpleDateFormat("dd.MM.yyyy");
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.YYYY");
-		Workbook workbook = new HSSFWorkbook();
-		FileOutputStream fileOut = null;
 		int prevACChier = -1;
+		int currACCcounter = 0;
+		boolean outOfACC = false;
 
 		try {
-			while (accountsForReport.next()) {
-				
-				
-				
-				ResultSet accNumberData = dataProvider
-						.getAccountNumberForReport(accountsForReport.getString(2));
+			while (!outOfACC) {
 
-				accNumberData.next();
-				String accNumber = accNumberData.getString(2);
+				connection = server.openConn();
+				dataProvider = new DbDataProvider(connection);
+				if (connection != null) {
+					// Read next n accounts for reports
+					ResultSet accountsForWeeklyReport = dataProvider.weeklyEntriesData(date, currACCcounter);
+					outOfACC = true; // True means that all accounts have been reported
+					while (accountsForWeeklyReport.next()) {
+						outOfACC = false;
+						currACCcounter++;
+						ResultSet accNumberData = dataProvider
+								.getAccountNumberForReport(accountsForWeeklyReport.getString(2));
 
-				if (accNumber == null)
-					continue;
-				if (workbook.getSheet(accNumber) != null)
-					continue; // if we already have sheet with current acc name when skip
-				if (prevACChier == accountsForReport.getInt(1)) { // write data to the same hierarchy
-					System.out.println("**** " + accNumber);
-					ResultSet accData = dataProvider.getDetailsData(accountsForReport.getString(2));
-					saveAccToSheet(workbook, accData, accNumber, reportName,
-							dateFormat.format(accountsForReport.getDate(6)) + " - "
-									+ formatter.format(LocalDate.now()) );
-					prevACChier = accountsForReport.getInt(1);
-				} else { // create new file for other hierarchy
-					System.out.println("**** " + accNumber);
-					if (workbook.getNumberOfSheets() != 0) {
-						ResultSet topAcc = dataProvider.getTopAccountNumber(accountsForReport.getString(1));
-						if(topAcc.next()) {
-							String fileName;
-						if(topAcc.getString(1)==null)
-							fileName = topAcc.getString(3);
-						else
-							fileName = topAcc.getString(1);
-						
-							fileOut = new FileOutputStream(filePath+"/"+fileName + "_" + dateFormat.format(accountsForReport.getDate(6)) + "-"
-									+  formatter.format(LocalDate.now())+ "("+reportName+").xls");
+						accNumberData.next();
+						String accNumber = accNumberData.getString(2);
 
-						workbook.write(fileOut);
+						if (accNumber == null)
+							continue;
+
+						if (workbook.getSheet(accNumber) != null) // if we already have sheet with current acc name when
+																	// skip
+							continue;
+
+						if (prevACChier == accountsForWeeklyReport.getInt(1)) { // write data to the same hierarchy
+							System.out.println("**** " + accNumber);
+
+							// Get account detailed info
+							ResultSet accData = dataProvider.getDetailsData(accountsForWeeklyReport.getString(2));
+
+							saveAccToSheet(workbook, accData, accNumber, reportName,
+									dateFormat.format(accountsForWeeklyReport.getDate(6)) + " - "
+											+ formatter.format(LocalDate.now()));
+
+							prevACChier = accountsForWeeklyReport.getInt(1);
+						} else { // create new file for other hierarchy
+							System.out.println("**** " + accNumber);
+							if (workbook.getNumberOfSheets() != 0) {
+								ResultSet topAcc = dataProvider
+										.getTopAccountNumber(accountsForWeeklyReport.getString(1));
+								if (topAcc.next()) {
+									String fileName;
+									if (topAcc.getString(1) == null)// if account don`t have acc_number
+										fileName = topAcc.getString(3); // use acc_name instead
+									else
+										fileName = topAcc.getString(1);
+
+									// Save file [path]/[acc_number or acc_name]_[From date_ to today][(Type of
+									// report)]
+									fileOut = new FileOutputStream(folderForWeeklyRepotrs + "/" + fileName + "_"
+											+ dateFormat.format(accountsForWeeklyReport.getDate(6)) + "-"
+											+ dateFormat.format(accountsForWeeklyReport.getDate(7)) + "(" + reportName + ").xls");
+
+									workbook.write(fileOut);
+								}
+								fileOut.close();
+							}
+
+							workbook = new HSSFWorkbook();
+
+							// Get account detailed info
+							ResultSet AccData = dataProvider.getDetailsData(accountsForWeeklyReport.getString(2));
+
+							// Save to sheet
+							saveAccToSheet(workbook, AccData, accNumber, reportName,
+									dateFormat.format(accountsForWeeklyReport.getDate(6)) + " - "
+											+ formatter.format(LocalDate.now()));
+							prevACChier = accountsForWeeklyReport.getInt(1);
+
 						}
-						fileOut.close();
-					}
 
-					workbook = new HSSFWorkbook();
-					ResultSet AccData = dataProvider.getDetailsData(accountsForReport.getString(2));
-					saveAccToSheet(workbook, AccData, accNumber, reportName,
-							dateFormat.format(accountsForReport.getDate(6)) + " - "
-									+ formatter.format(LocalDate.now()));
-					prevACChier = accountsForReport.getInt(1);
-				    
+					}
+					server.endConn(connection);
+
+				} else {// if connection is failed
+					outOfACC = false;
+					System.err.println("Can`t connect to database");
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					continue;
 				}
 			}
 		} catch (SQLException ex) {
@@ -310,7 +346,7 @@ public class ExcelSaveData {
 				System.err.println("Error msg: " + ex.getMessage());
 				System.err.println("SQLSTATE: " + ex.getSQLState());
 				System.err.println("Error code: " + ex.getErrorCode());
-				
+
 				ex.printStackTrace();
 				ex = ex.getNextException(); // For drivers that support chained exceptions
 			}
@@ -321,6 +357,161 @@ public class ExcelSaveData {
 
 			}
 		}
+	}
+
+	public void monthlyEntries(String date) {
+		System.out.println("--------------Monthly-------------");
+
+		String reportName = "Monthly";
+
+		// For excel file
+		workbook = new HSSFWorkbook();
+
+		int prevACChier = -1;
+		int currACCcounter = 0;
+		boolean outOfACC = false;
+
+		try {
+			while (!outOfACC) {
+				connection = server.openConn();
+				dataProvider = new DbDataProvider(connection);
+				if (connection != null) {
+					// Read next n accounts for reports
+					ResultSet accountsForMonthlyReport = dataProvider.monthlyEntriesData(date, currACCcounter);
+					outOfACC = true; // True means that all accounts have been reported
+					while (accountsForMonthlyReport.next()) {
+
+						outOfACC = false;
+						currACCcounter++;
+						ResultSet accNumberData = dataProvider
+								.getAccountNumberForReport(accountsForMonthlyReport.getString(2));
+
+						accNumberData.next();
+						String accNumber = accNumberData.getString(2);
+
+						if (accNumber == null)
+							continue;
+
+						if (workbook.getSheet(accNumber) != null) // if we already have sheet with current acc name when
+							continue; // skip
+
+						if (prevACChier == accountsForMonthlyReport.getInt(1)) { // write data to the same hierarchy
+							System.out.println("**** " + accNumber);
+
+							// Get account detailed info
+							ResultSet accData = dataProvider.getDetailsData(accountsForMonthlyReport.getString(2));
+
+							saveAccToSheet(workbook, accData, accNumber, reportName,
+									dateFormat.format(accountsForMonthlyReport.getDate(6)) + " - "
+											+ formatter.format(LocalDate.now()));
+
+							prevACChier = accountsForMonthlyReport.getInt(1);
+						} else { // create new file for other hierarchy
+							System.out.println("**** " + accNumber);
+							if (workbook.getNumberOfSheets() != 0) {
+
+								ResultSet topAcc = dataProvider
+										.getTopAccountNumber(accountsForMonthlyReport.getString(1));
+
+								if (topAcc.next()) {
+									String fileName;
+									if (topAcc.getString(1) == null) // if account don`t have acc_number
+										fileName = topAcc.getString(3); // use acc_name instead
+									else
+										fileName = topAcc.getString(1);
+
+									// Save file [path]/[acc_number or acc_name]_[From date_ to today][(Type of
+									// report)]
+									fileOut = new FileOutputStream(folderForMonthlyRepotrs + "/" + fileName + "_"
+											+ dateFormat.format(accountsForMonthlyReport.getDate(6)) + "-"
+											+ formatter.format(LocalDate.now()) + "(" + reportName + ").xls");
+
+									workbook.write(fileOut);
+								}
+								fileOut.close();
+							}
+
+							workbook = new HSSFWorkbook(); // new excel file
+
+							// Get account detailed info
+							ResultSet AccData = dataProvider.getDetailsData(accountsForMonthlyReport.getString(2));
+
+							// Write info to sheet
+							saveAccToSheet(workbook, AccData, accNumber, reportName,
+									dateFormat.format(accountsForMonthlyReport.getDate(6)) + " - "
+											+ formatter.format(LocalDate.now()));
+
+							prevACChier = accountsForMonthlyReport.getInt(1);
+
+						}
+
+					}
+					server.endConn(connection);
+				} else {// if connection is failed
+					outOfACC = false;
+					System.err.println("Can`t connect to database");
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					continue;
+				}
+			}
+		} catch (SQLException ex) {
+			System.err.println("SQLException information");
+			while (ex != null) {
+				System.err.println("Error msg: " + ex.getMessage());
+				System.err.println("SQLSTATE: " + ex.getSQLState());
+				System.err.println("Error code: " + ex.getErrorCode());
+
+				ex.printStackTrace();
+				ex = ex.getNextException(); // For drivers that support chained exceptions
+			}
+		} catch (IOException ex) {
+			System.err.println("IOException information");
+			while (ex != null) {
+				System.err.println("Error msg: " + ex.getMessage());
+
+			}
+		}
+	}
+
+	private String getMoney(String value) { //Convert to Interest Bearing Balance 123456 => 1234,56 EUR
+		StringBuffer buffer = new StringBuffer(value);
+		if (buffer.length() > 2)
+			buffer.insert(value.length() - 2, ",");
+		else if (buffer.length() == 2)
+			buffer.insert(0, "0,");
+		else if (buffer.length() == 1)
+			buffer.insert(0, "0,0");
+		buffer.insert(buffer.length(), " EUR");
+		return buffer.toString();
+	}
+	
+	private String getRate(String value) { //Convert to Total interest rate 2500000 => 0,2500000%
+		StringBuffer buffer = new StringBuffer(value);
+		int offset = 0;
+		if (buffer.length() == 1 && buffer.charAt(0) == '0') {
+			buffer.insert(1, "%");
+		} else {
+			if (buffer.charAt(0) == '-')
+				offset = 1;
+
+			if (buffer.length() == 7 + offset) {
+				buffer.insert(offset, "0,");
+			} else if (buffer.length() < 7 + offset) {
+				String zeros = "0,";
+				for (int i = (7 + offset) - buffer.length(); i > 0; i--)
+					zeros += "0";
+				buffer.insert(offset, zeros);
+			} else if (buffer.length() > 7 + offset) {
+				buffer.insert((buffer.length() - (7 + offset)) + offset, ",");
+			}
+			buffer.insert(buffer.length(), "%");
+		}
+		return buffer.toString();
 	}
 
 	private void getDailyReport(DbDataProvider dataProvider, ResultSet accountsForReport, String reportName,
@@ -350,15 +541,16 @@ public class ExcelSaveData {
 					System.out.println("**** " + accNumber);
 					if (workbook.getNumberOfSheets() != 0) {
 						ResultSet topAcc = dataProvider.getTopAccountNumber(accountsForReport.getString(1));
-						if(topAcc.next()) {
+						if (topAcc.next()) {
 							String fileName;
-						if(topAcc.getString(1)==null)
-							fileName = topAcc.getString(3);
-						else
-							fileName = topAcc.getString(1);
-							fileOut = new FileOutputStream(filePath+"/"+fileName + "_" + reportPeriod + "(" + reportName + ").xls");
-						workbook.write(fileOut);
-						
+							if (topAcc.getString(1) == null)
+								fileName = topAcc.getString(3);
+							else
+								fileName = topAcc.getString(1);
+							fileOut = new FileOutputStream(
+									filePath + "/" + fileName + "_" + reportPeriod + "(" + reportName + ").xls");
+							workbook.write(fileOut);
+
 						}
 						fileOut.close();
 					}
@@ -389,5 +581,4 @@ public class ExcelSaveData {
 
 	}
 
-	
 }

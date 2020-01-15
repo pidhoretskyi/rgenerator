@@ -63,9 +63,6 @@ public class DbConnProvider {
 			// Connection must be on a unit-of-work boundary to allow close
 			connection.close();
 			
-			if (connection.isClosed()) {
-				System.out.println("Connection is closed");
-			}
 		}catch (SQLException ex) {
 			System.err.println("SQLException information");
 			while (ex != null) {

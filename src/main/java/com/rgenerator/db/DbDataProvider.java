@@ -56,13 +56,13 @@ public class DbDataProvider {
 				"                                CALCU_CONSUMED_AMOUNT AS \"Interest Bearing Balance\", \r\n" +
 				"                                CALCU_RATE_PERCENT AS \"Total Interest Rate (%)\", \r\n" + 
 				"                                FCOND_NAME AS \"Interest Basis\",\r\n" + 
-				"                               SETTLEMENT_TYPE AS \"Settlement type\"\r\n" + 
+				"                                SETTLEMENT_TYPE AS \"Settlement type\"\r\n" + 
 				"                          FROM ACCT.ACCOUNT_RESULT_DETAILS WHERE ACC_ID = "+account+"\r\n" + 
 				"                          AND CALCU_TYPE = 'INT'\r\n" + 
-				"ORDER BY CALCU_REG_TIMESTAMP DESC");
+				"ORDER BY CALCU_TO_DATE ASC");
 	}
 	
-	public ResultSet weeklyEntriesData(String date) {
+	public ResultSet weeklyEntriesData(String date, int startFrom) {
 		return dataProvider(
 				"-- Weekly\r\n" + 
 				"SELECT \r\n" + 
@@ -80,10 +80,10 @@ public class DbDataProvider {
 				"      date('"+date+"') BETWEEN ar.RESUL_FROM_DATE AND ar.RESUL_TO_DATE\r\n" + 
 				"  AND DAYOFWEEK(date('"+date+"')) = 1 -- Sunday\r\n" + 
 				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n" + 
-				"-- then extract account_result_details based on data in account_result");
+				"LIMIT 300 OFFSET " + (startFrom));
 	}
 	
-	public ResultSet monthlyEntriesData(String date) {
+	public ResultSet monthlyEntriesData(String date, int startFrom) {
 		return dataProvider("-- Monthly\r\n" + 
 				"-- for each row of this resultset\r\n" + 
 				"SELECT \r\n" + 
@@ -101,7 +101,8 @@ public class DbDataProvider {
 				"    OR YEAR(ar.RESUL_TO_DATE) > YEAR('"+date+"')\r\n" + 
 				"    OR YEAR(ar.RESUL_TO_DATE) = YEAR('"+date+"') AND MONTH(ar.RESUL_TO_DATE) > MONTH('"+date+"')\r\n" + 
 				"    --\r\n" + 
-				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE");
+				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n" +
+				"LIMIT 300 OFFSET " + (startFrom));
 	}
 	
 	public ResultSet getHierarchy(String account) {
