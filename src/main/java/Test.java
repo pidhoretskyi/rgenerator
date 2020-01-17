@@ -10,8 +10,8 @@ public class Test {
 
 		// ex.dailyEnries("2020-01-12");
 
-		 ex.weeklyEntries("2020-01-12");
-		 ex.monthlyEntries("2020-01-15");
+		//ex.weeklyEntries("2019-12-31");
+		ex.monthlyEntries("2020-01-16");
 
 	}
 

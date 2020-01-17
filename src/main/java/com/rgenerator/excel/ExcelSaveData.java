@@ -1,24 +1,15 @@
 package com.rgenerator.excel;
 
-//import java.sql.DriverManager;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-//import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-//import java.util.ArrayList;
 import java.util.Calendar;
-//import java.util.List;
-
 import com.ibm.db2.jcc.am.Connection;
 import com.ibm.db2.jcc.am.ResultSet;
 import com.rgenerator.db.DbConnProvider;
 import com.rgenerator.db.DbDataProvider;
-
-//import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-
-//import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -79,6 +70,7 @@ public class ExcelSaveData {
 
 			Sheet sheet = workbook.createSheet(ACCname);
 
+			// Create header information
 			Row rowReportName = sheet.createRow(0);
 			Row rowReportPeriod = sheet.createRow(1);
 			Row rowReportedASOn = sheet.createRow(2);
@@ -140,19 +132,33 @@ public class ExcelSaveData {
 
 			// System.out.println("**** Writing to file");
 			Row row = sheet.createRow(currentRow++);
+			int cellcount = 0;
 			for (int i = 1; i <= columnCount; i++) {
-				Cell cell = row.createCell(i - 1);
-				cell.setCellValue(data.getColumnLabel(i));
+				if (i == 6) {
+					Cell cell = row.createCell(cellcount++);
+					cell.setCellValue("Calculated Interest Credit");
+					cell.setCellStyle(headerCellStyle);
+					//i++;
+					cell = row.createCell(cellcount++);
+					cell.setCellValue("Calculated Interest Debit");
+					cell.setCellStyle(headerCellStyle);
+					
+				} else {
+					Cell cell = row.createCell(cellcount++);
+					cell.setCellValue(data.getColumnLabel(i));
 
-				cell.setCellStyle(headerCellStyle);
+					cell.setCellStyle(headerCellStyle);
+				}
 			}
 
+			// File file with data
 			boolean isDataExist = false;
 			while (ACCdata.next()) {
 				isDataExist = true;
 				row = sheet.createRow(currentRow++);
+				cellcount = 0;
 				for (int i = 1; i <= columnCount; i++) {
-					Cell cell = row.createCell(i - 1);
+					Cell cell = row.createCell(cellcount++);
 
 					if (data.getColumnType(i) == java.sql.Types.DATE) {
 						cell.setCellStyle(dateCellStyle);
@@ -163,21 +169,39 @@ public class ExcelSaveData {
 						cell.setCellValue(ACCdata.getTimestamp(i));
 
 					} else {
-						if (i == 7)
+						if(i==6) { //Interest credit and debit
+							if(ACCdata.getString(i).charAt(0)=='-') {//Debit
+								cell.setCellValue(getMoney(ACCdata.getString(i), currency));
+								cell.setCellStyle(textCellStyle);
+								cell = row.createCell(cellcount++);
+								cell.setCellValue(getMoney("0", currency));
+							}else if(ACCdata.getString(i).compareTo("0")==0 ) { // zero
+								cell.setCellValue(getMoney("0", currency));
+								cell.setCellStyle(textCellStyle);
+								cell = row.createCell(cellcount++);
+								cell.setCellValue(getMoney("0", currency));
+							}else {//Credit
+								cell.setCellValue(getMoney("0", currency));
+								cell.setCellStyle(textCellStyle);
+								cell = row.createCell(cellcount++);
+								cell.setCellValue(getMoney(ACCdata.getString(i), currency));
+							}
+						}
+						else if (i == 7) // Interest Bearing Balance
 							cell.setCellValue(getMoney(ACCdata.getString(i), currency));
-						else if (i == 8)
+						else if (i == 8) // Total Interest Rate
 							cell.setCellValue(getRate(ACCdata.getString(i)));
-						else
+						else // Text data
 							cell.setCellValue(ACCdata.getString(i));
 						cell.setCellStyle(textCellStyle);
 					}
 				}
 			}
-			if (!isDataExist) {
+			if (!isDataExist) { // Remove empty sheet
 				workbook.removeSheetAt(workbook.getSheetIndex(sheet));
 				return;
 			}
-			for (int i = 0; i < columnCount; i++) {
+			for (int i = 0; i < columnCount; i++) { // Autosize columns
 				sheet.autoSizeColumn(i);
 			}
 		} catch (SQLException ex) {
@@ -261,7 +285,7 @@ public class ExcelSaveData {
 					// Read next n accounts for reports
 					ResultSet accountsForWeeklyReport = dataProvider.weeklyEntriesData(date, currACCcounter);
 					outOfACC = true; // True means that all accounts have been reported
-					while (accountsForWeeklyReport.next()) {
+					while (accountsForWeeklyReport.next()) { // If data exist
 						outOfACC = false;
 						currACCcounter++;
 						ResultSet accNumberData = dataProvider
@@ -274,8 +298,7 @@ public class ExcelSaveData {
 							continue;
 
 						if (workbook.getSheet(accNumber) != null) // if we already have sheet with current acc name when
-																	// skip
-							continue;
+							continue; // skip
 
 						if (prevACChier == accountsForWeeklyReport.getInt(1)) { // write data to the same hierarchy
 							System.out.println("**** " + accNumber);
@@ -283,15 +306,19 @@ public class ExcelSaveData {
 							// Get account detailed info
 							ResultSet accData = dataProvider.getDetailsData(accountsForWeeklyReport.getString(2),
 									accountsForWeeklyReport.getString(6), accountsForWeeklyReport.getString(7));
+							// Get account currency
 							ResultSet accCurr = dataProvider.getCurrency(accountsForWeeklyReport.getString(2));
 							accCurr.next();
 
+							// Save account data into sheet
 							saveAccToSheet(workbook, accData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForWeeklyReport.getDate(6)) + " - "
 											+ dateFormat.format(accountsForWeeklyReport.getDate(7)));
 
 							prevACChier = accountsForWeeklyReport.getInt(1);
 						} else { // create new file for other hierarchy
+
+							// Save previous file
 							System.out.println("**** " + accNumber);
 							if (workbook.getNumberOfSheets() != 0) {
 								ResultSet topAcc = dataProvider
@@ -315,6 +342,7 @@ public class ExcelSaveData {
 								fileOut.close();
 							}
 
+							// Create new file
 							workbook = new HSSFWorkbook();
 
 							// Get account detailed info
@@ -323,7 +351,7 @@ public class ExcelSaveData {
 							ResultSet accCurr = dataProvider.getCurrency(accountsForWeeklyReport.getString(2));
 							accCurr.next();
 
-							// Save to sheet
+							// Save account data into sheet
 							saveAccToSheet(workbook, AccData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForWeeklyReport.getDate(6)) + " - "
 											+ dateFormat.format(accountsForWeeklyReport.getDate(7)));
@@ -340,7 +368,7 @@ public class ExcelSaveData {
 					try {
 						Thread.sleep(5000);
 					} catch (InterruptedException e) {
-						
+
 						e.printStackTrace();
 					}
 					continue;
@@ -381,12 +409,13 @@ public class ExcelSaveData {
 			while (!outOfACC) {
 				connection = server.openConn();
 				dataProvider = new DbDataProvider(connection);
+
 				if (connection != null) {
 					// Read next n accounts for reports
 					ResultSet accountsForMonthlyReport = dataProvider.monthlyEntriesData(date, currACCcounter);
 					outOfACC = true; // True means that all accounts have been reported
-					while (accountsForMonthlyReport.next()) {
 
+					while (accountsForMonthlyReport.next()) {
 						outOfACC = false;
 						currACCcounter++;
 						ResultSet accNumberData = dataProvider
@@ -410,12 +439,14 @@ public class ExcelSaveData {
 							ResultSet accCurr = dataProvider.getCurrency(accountsForMonthlyReport.getString(2));
 							accCurr.next();
 
+							// Save account data into sheet
 							saveAccToSheet(workbook, accData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForMonthlyReport.getDate(6)) + " - "
-											+ formatter.format(LocalDate.now()));
+											+ formatter.format(LocalDate.now().minusDays(1)));
 
 							prevACChier = accountsForMonthlyReport.getInt(1);
 						} else { // create new file for other hierarchy
+							// Save previous file
 							System.out.println("**** " + accNumber);
 							if (workbook.getNumberOfSheets() != 0) {
 
@@ -433,14 +464,15 @@ public class ExcelSaveData {
 									// report)]
 									fileOut = new FileOutputStream(folderForMonthlyRepotrs + "/" + fileName + "_"
 											+ dateFormat.format(accountsForMonthlyReport.getDate(6)) + "-"
-											+ formatter.format(LocalDate.now()) + "(" + reportName + ").xls");
+											+ formatter.format(LocalDate.now().minusDays(1)) + "(" + reportName + ").xls");
 
 									workbook.write(fileOut);
 								}
 								fileOut.close();
 							}
 
-							workbook = new HSSFWorkbook(); // new excel file
+							// Create new file
+							workbook = new HSSFWorkbook();
 
 							// Get account detailed info
 							ResultSet AccData = dataProvider.getDetailsData(accountsForMonthlyReport.getString(2),
@@ -451,7 +483,7 @@ public class ExcelSaveData {
 							// Write info to sheet
 							saveAccToSheet(workbook, AccData, accNumber, accCurr.getString(2), reportName,
 									dateFormat.format(accountsForMonthlyReport.getDate(6)) + " - "
-											+ formatter.format(LocalDate.now()));
+											+ formatter.format(LocalDate.now().minusDays(1)));
 
 							prevACChier = accountsForMonthlyReport.getInt(1);
 
@@ -465,7 +497,7 @@ public class ExcelSaveData {
 					try {
 						Thread.sleep(5000);
 					} catch (InterruptedException e) {
-						
+
 						e.printStackTrace();
 					}
 					continue;
