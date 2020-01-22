@@ -5,11 +5,17 @@ import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Calendar;
 import com.ibm.db2.jcc.am.Connection;
 import com.ibm.db2.jcc.am.ResultSet;
 import com.rgenerator.db.DbConnProvider;
 import com.rgenerator.db.DbDataProvider;
+
+import reader.AccountsForReport;
+import reader.Interest;
+import reader.ReportGenerator;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -57,6 +63,7 @@ public class ExcelSaveData {
 		formatter = DateTimeFormatter.ofPattern("dd.MM.YYYY");
 
 		server = new DbConnProvider();
+		server.connectionToFirstDB();
 
 		fileOut = null;
 	}
@@ -134,15 +141,25 @@ public class ExcelSaveData {
 			Row row = sheet.createRow(currentRow++);
 			int cellcount = 0;
 			for (int i = 1; i <= columnCount; i++) {
-				if (i == 6) {
+				if (i == 3) {
+					Cell cell = row.createCell(cellcount++);
+					cell.setCellValue("Settlement Account Number");
+					cell.setCellStyle(headerCellStyle);
+					cell = row.createCell(cellcount++);
+					cell.setCellValue("Settlement Account Name");
+					cell.setCellStyle(headerCellStyle);
+					cell = row.createCell(cellcount++);
+					cell.setCellValue(data.getColumnLabel(i));
+					cell.setCellStyle(headerCellStyle);
+				} else if (i == 7) {
 					Cell cell = row.createCell(cellcount++);
 					cell.setCellValue("Calculated Interest Credit");
 					cell.setCellStyle(headerCellStyle);
-					//i++;
+					// i++;
 					cell = row.createCell(cellcount++);
 					cell.setCellValue("Calculated Interest Debit");
 					cell.setCellStyle(headerCellStyle);
-					
+
 				} else {
 					Cell cell = row.createCell(cellcount++);
 					cell.setCellValue(data.getColumnLabel(i));
@@ -157,6 +174,7 @@ public class ExcelSaveData {
 				isDataExist = true;
 				row = sheet.createRow(currentRow++);
 				cellcount = 0;
+				int offset = 0;
 				for (int i = 1; i <= columnCount; i++) {
 					Cell cell = row.createCell(cellcount++);
 
@@ -169,27 +187,54 @@ public class ExcelSaveData {
 						cell.setCellValue(ACCdata.getTimestamp(i));
 
 					} else {
-						if(i==6) { //Interest credit and debit
-							if(ACCdata.getString(i).charAt(0)=='-') {//Debit
-								cell.setCellValue(getMoney(ACCdata.getString(i), currency));
+						if (i == 3) {
+							ResultSet settlement = getSettlement(ACCdata.getString(1));
+							if (settlement == null) {
+
+								cell.setCellStyle(textCellStyle);
+								cell.setCellValue("Empty");
+
+								cell = row.createCell(cellcount++);
+
+								cell.setCellValue("Empty");
 								cell.setCellStyle(textCellStyle);
 								cell = row.createCell(cellcount++);
-								cell.setCellValue(getMoney("0", currency));
-							}else if(ACCdata.getString(i).compareTo("0")==0 ) { // zero
-								cell.setCellValue(getMoney("0", currency));
+								cell.setCellValue(ACCdata.getString(i));
+
+							} else {
+								// settlement.next();
+
+								cell.setCellStyle(textCellStyle);
+								cell.setCellValue(settlement.getString(2));
+
+								cell = row.createCell(cellcount++);
+
+								cell.setCellValue(settlement.getString(3));
 								cell.setCellStyle(textCellStyle);
 								cell = row.createCell(cellcount++);
-								cell.setCellValue(getMoney("0", currency));
-							}else {//Credit
-								cell.setCellValue(getMoney("0", currency));
-								cell.setCellStyle(textCellStyle);
-								cell = row.createCell(cellcount++);
-								cell.setCellValue(getMoney(ACCdata.getString(i), currency));
+								cell.setCellValue(ACCdata.getString(i));
 							}
 						}
-						else if (i == 7) // Interest Bearing Balance
+						if (i == 7) { // Interest credit and debit
+							if (ACCdata.getString(i).charAt(0) == '-') {// Debit
+								cell.setCellValue(getMoney("0", currency));
+								cell.setCellStyle(textCellStyle);
+								cell = row.createCell(cellcount++);
+								cell.setCellValue(getMoney(ACCdata.getString(i), currency));
+							} else if (ACCdata.getString(i).compareTo("0") == 0) { // zero
+								cell.setCellValue(getMoney("0", currency));
+								cell.setCellStyle(textCellStyle);
+								cell = row.createCell(cellcount++);
+								cell.setCellValue(getMoney("0", currency));
+							} else {// Credit
+								cell.setCellValue(getMoney(ACCdata.getString(i), currency));
+								cell.setCellStyle(textCellStyle);
+								cell = row.createCell(cellcount++);
+								cell.setCellValue(getMoney("0", currency));
+							}
+						} else if (i == 8) // Interest Bearing Balance
 							cell.setCellValue(getMoney(ACCdata.getString(i), currency));
-						else if (i == 8) // Total Interest Rate
+						else if (i == 9) // Total Interest Rate
 							cell.setCellValue(getRate(ACCdata.getString(i)));
 						else // Text data
 							cell.setCellValue(ACCdata.getString(i));
@@ -201,7 +246,7 @@ public class ExcelSaveData {
 				workbook.removeSheetAt(workbook.getSheetIndex(sheet));
 				return;
 			}
-			for (int i = 0; i < columnCount; i++) { // Autosize columns
+			for (int i = 0; i < cellcount; i++) { // Autosize columns
 				sheet.autoSizeColumn(i);
 			}
 		} catch (SQLException ex) {
@@ -283,6 +328,7 @@ public class ExcelSaveData {
 				dataProvider = new DbDataProvider(connection);
 				if (connection != null) {
 					// Read next n accounts for reports
+					System.out.println("Still open");
 					ResultSet accountsForWeeklyReport = dataProvider.weeklyEntriesData(date, currACCcounter);
 					outOfACC = true; // True means that all accounts have been reported
 					while (accountsForWeeklyReport.next()) { // If data exist
@@ -321,8 +367,7 @@ public class ExcelSaveData {
 							// Save previous file
 							System.out.println("**** " + accNumber);
 							if (workbook.getNumberOfSheets() != 0) {
-								ResultSet topAcc = dataProvider
-										.getTopAccountNumber(accountsForWeeklyReport.getString(1));
+								ResultSet topAcc = dataProvider.getTopAccountNumber(String.valueOf(prevACChier));
 								if (topAcc.next()) {
 									String fileName;
 									if (topAcc.getString(1) == null)// if account don`t have acc_number
@@ -360,7 +405,6 @@ public class ExcelSaveData {
 						}
 
 					}
-					server.endConn(connection);
 
 				} else {// if connection is failed
 					outOfACC = false;
@@ -373,6 +417,7 @@ public class ExcelSaveData {
 					}
 					continue;
 				}
+				server.endConn(connection);
 			}
 		} catch (SQLException ex) {
 			System.err.println("SQLException information");
@@ -393,6 +438,456 @@ public class ExcelSaveData {
 		}
 	}
 
+	public void saveACC(Workbook workbook, ArrayList<Interest> ACCdata, String ACCname, String reportName,
+			String reportPeriod) {
+
+		Sheet sheet = workbook.createSheet(ACCname);
+		// Create header information
+		Row rowReportName = sheet.createRow(0);
+		Row rowReportPeriod = sheet.createRow(1);
+		Row rowReportedASOn = sheet.createRow(2);
+
+		Cell cell1 = rowReportName.createCell(0);
+		Cell cell2 = rowReportPeriod.createCell(0);
+		Cell cell3 = rowReportedASOn.createCell(0);
+
+		HSSFRichTextString richTextStringRow1 = new HSSFRichTextString("Report Name : " + reportName);
+		HSSFRichTextString richTextStringRow2 = new HSSFRichTextString(
+				"Report Period (from-date, to-date): " + reportPeriod);
+		HSSFRichTextString richTextStringRow3 = new HSSFRichTextString("Reported As On : "
+				+ new SimpleDateFormat("dd.MM.yyyy HH:mm").format(Calendar.getInstance().getTime()));
+
+		Font fontBolt = workbook.createFont();
+		fontBolt.setBold(true);
+
+		richTextStringRow1.applyFont(0, 12, fontBolt);
+		richTextStringRow2.applyFont(0, 35, fontBolt);
+		richTextStringRow3.applyFont(0, 17, fontBolt);
+
+		cell1.setCellValue(richTextStringRow1);
+		cell2.setCellValue(richTextStringRow2);
+		cell3.setCellValue(richTextStringRow3);
+
+		sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 4));
+		sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 4));
+		sheet.addMergedRegion(new CellRangeAddress(2, 2, 0, 4));
+
+		// Date style
+		CellStyle dateCellStyle = workbook.createCellStyle();
+		CreationHelper createHelper = workbook.getCreationHelper();
+		dateCellStyle.setDataFormat(createHelper.createDataFormat().getFormat("DD.MM.YYYY"));
+		dateCellStyle.setAlignment(HorizontalAlignment.CENTER);
+		dateCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+		dateCellStyle.setAlignment(HorizontalAlignment.CENTER);
+		dateCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+		// Header style
+		Font headerFont = workbook.createFont();
+		headerFont.setBold(true);
+		headerFont.setFontHeightInPoints((short) 10);
+		headerFont.setColor(IndexedColors.BLACK.getIndex());
+		CellStyle headerCellStyle = workbook.createCellStyle();
+		headerCellStyle.setFont(headerFont);
+		headerCellStyle.setFillForegroundColor(IndexedColors.YELLOW.getIndex());
+		headerCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+		headerCellStyle.setAlignment(HorizontalAlignment.CENTER);
+		headerCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+		// Percentage style 45.548%
+		CellStyle perStyle = workbook.createCellStyle();
+		perStyle.setDataFormat(workbook.createDataFormat().getFormat("0.000%"));
+		perStyle.setAlignment(HorizontalAlignment.CENTER);
+		perStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+		// Calcu style 154,456.1531
+		CellStyle calcuStyle = workbook.createCellStyle();
+		calcuStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.0000"));
+		calcuStyle.setAlignment(HorizontalAlignment.CENTER);
+		calcuStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+		// Money style
+		CellStyle moneyStyle = workbook.createCellStyle();
+		moneyStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+		moneyStyle.setAlignment(HorizontalAlignment.CENTER);
+		moneyStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+		// Text style
+		CellStyle textCellStyle = workbook.createCellStyle();
+		textCellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+		textCellStyle.setAlignment(HorizontalAlignment.CENTER);
+
+		ReportGenerator report = new ReportGenerator();
+		int cellcount = 0;
+		int currentRow = 4;
+		Row row = sheet.createRow(currentRow++);
+		Cell cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_accID());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_accName());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_ownerName());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_settlemNum());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_settleName());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_settleOwner());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_bankID());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_calcuType());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_calcuNum());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_toDate());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_currency());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_interestCredit());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_interestDebit());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_bearingBalance());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_rate());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_basis());
+		cell.setCellStyle(headerCellStyle);
+		cell = row.createCell(cellcount++);
+		cell.setCellValue(report.getColum_settleType());
+		cell.setCellStyle(headerCellStyle);
+
+		for (int i = 0; i < ACCdata.size(); i++) {
+			row = sheet.createRow(currentRow++);
+			cellcount = 0;
+			Interest record = ACCdata.get(i);
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getAccID());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getAccName());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getOwnerName());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getSettlemNum());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getSettleName());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getSettleOwner());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getBankID());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getCalcuType());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getCalcuNum());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(dateCellStyle);
+			cell.setCellValue(record.getToDate());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getCurrency());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(calcuStyle);
+			cell.setCellValue(record.getInterestCredit());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(calcuStyle);
+			cell.setCellValue(record.getInterestDebit());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(moneyStyle);
+			cell.setCellValue(record.getBearingBalance());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(perStyle);
+			cell.setCellValue(record.getRate());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getBasis());
+
+			cell = row.createCell(cellcount++);
+			cell.setCellStyle(textCellStyle);
+			cell.setCellValue(record.getSettleType());
+		}
+
+		for (int i = 0; i < cellcount; i++) { // Autosize columns
+			sheet.autoSizeColumn(i);
+		}
+
+	}
+
+	public void monthlyReport(LocalDate fromDate, LocalDate toDate) {
+		System.out.println("--------------Monthly-------------");
+		String reportName = "Monthly";
+
+		// For excel file
+		workbook = new HSSFWorkbook();
+
+		int prevACChier = -1;
+		int currACCcounter = 0;
+		boolean outOfACC = false;
+		String fileName = null;
+
+		try {
+			while (!outOfACC) {
+				connection = server.openConn();
+				dataProvider = new DbDataProvider(connection);
+				if (connection != null) {
+					// System.out.println("Still open1");
+					ResultSet accountsForMonthlyReport = dataProvider.monthlyEntriesData(toDate.toString(),
+							currACCcounter);
+
+					outOfACC = true; // True means that all accounts have been reported
+
+					while (accountsForMonthlyReport.next()) {
+
+						outOfACC = false;
+						currACCcounter++;
+						// System.out.println("Still open2");
+						ReportGenerator report = new ReportGenerator();
+
+						ResultSet accNumberData = dataProvider
+								.getAccountNumberForReport(accountsForMonthlyReport.getString(2));
+						accNumberData.next();
+						String accNumber = accNumberData.getString(2);
+						System.out.println("**** " + accNumber);
+						if (accNumber == null)
+							continue;
+
+						if (workbook.getSheet(accNumber) != null) // if we already have sheet with current acc name when
+							continue; // skip
+						if (prevACChier == accountsForMonthlyReport.getInt(1)) {// write data to the same hierarchy
+							// System.out.println("Still open3");
+							ArrayList<Interest> accData = report.getReport(accountsForMonthlyReport.getString(2),
+									fromDate, toDate);
+							if (accData.size() == 0)
+								continue;
+							saveACC(workbook, accData, accNumber, reportName,
+									formatter.format(fromDate) + " - " + formatter.format(toDate));
+						} else {
+							if (workbook.getNumberOfSheets() != 0) {
+
+								// System.out.println("Still open4");
+								ResultSet topAcc = dataProvider.getTopAccountNumber(String.valueOf(prevACChier));
+
+								if (topAcc.next()) {
+									if (topAcc.getString(1) == null) // if account don`t have acc_number
+										fileName = topAcc.getString(3); // use acc_name instead
+									else
+										fileName = topAcc.getString(1);
+								}
+
+								// Save file [path]/[acc_number or acc_name]_[From date_ to today][(Type of
+								// report)]
+								System.out.println(fileName);
+								fileOut = new FileOutputStream(
+										folderForMonthlyRepotrs + "/" + fileName + "_" + formatter.format(fromDate)
+												+ "-" + formatter.format(toDate) + "(" + reportName + ").xls");
+
+								workbook.write(fileOut);
+								fileOut.close();
+							}
+
+							workbook = new HSSFWorkbook();
+							// System.out.println("Still open5");
+							ArrayList<Interest> accData = report.getReport(accountsForMonthlyReport.getString(2),
+									fromDate, toDate);
+							if (accData.size() == 0)
+								continue;
+							saveACC(workbook, accData, accNumber, reportName,
+									formatter.format(fromDate) + " - " + formatter.format(toDate));
+
+						}
+						prevACChier = accountsForMonthlyReport.getInt(1);
+
+					}
+
+				}
+				server.endConn(connection);
+				System.out.println("Count: " + currACCcounter);
+			}
+		} catch (SQLException ex) {
+			System.err.println("SQLException information");
+			while (ex != null) {
+				System.err.println("Error msg: " + ex.getMessage());
+				System.err.println("SQLSTATE: " + ex.getSQLState());
+				System.err.println("Error code: " + ex.getErrorCode());
+
+				ex.printStackTrace();
+				ex = ex.getNextException(); // For drivers that support chained exceptions
+			}
+		} catch (IOException ex) {
+			System.err.println("IOException information");
+			while (ex != null) {
+				System.err.println("Error msg: " + ex.getMessage());
+
+			}
+		}
+	}
+
+
+
+	public void getReport(int reportType, LocalDate fromDate, LocalDate toDate) {
+		
+		String reportName="";
+		String saveDirectory="";
+		if(reportType==1) {//Daily
+			System.out.println("--------------Daily-------------");
+			reportName="Daily";
+			
+		}
+		else if(reportType==2) {//Weekly
+			System.out.println("--------------Weekly-------------");
+			reportName="Weekly";
+			saveDirectory=folderForWeeklyRepotrs;
+		}
+		else if(reportType==3) {
+			System.out.println("--------------Monthly-------------");
+			reportName="Monthly";
+			saveDirectory=folderForMonthlyRepotrs;
+		}
+
+		// For excel file
+		workbook = new HSSFWorkbook();
+
+		int prevACChier = -1;
+		int currACCcounter = 0;
+		boolean outOfACC = false;
+		String fileName = null;
+
+		try {
+			while (!outOfACC) {
+				connection = server.openConn();
+				dataProvider = new DbDataProvider(connection);
+				if (connection != null) {
+					// System.out.println("Still open1");
+					ResultSet accountsForReport = dataProvider.getEntriesData(reportType, toDate.toString(), currACCcounter);
+
+					outOfACC = true; // True means that all accounts have been reported
+
+					while (accountsForReport.next()) {
+
+						outOfACC = false;
+						currACCcounter++;
+						// System.out.println("Still open2");
+						ReportGenerator report = new ReportGenerator();
+
+						ResultSet accNumberData = dataProvider
+								.getAccountNumberForReport(accountsForReport.getString(2));
+						accNumberData.next();
+						String accNumber = accNumberData.getString(2);
+						System.out.println("**** " + accNumber);
+						if (accNumber == null)
+							continue;
+
+						if (workbook.getSheet(accNumber) != null) // if we already have sheet with current acc name when
+							continue; // skip
+						if (prevACChier == accountsForReport.getInt(1)) {// write data to the same hierarchy
+							// System.out.println("Still open3");
+							ArrayList<Interest> accData = report.getReport(accountsForReport.getString(2),
+									fromDate, toDate);
+							if (accData.size() == 0)
+								continue;
+							saveACC(workbook, accData, accNumber, reportName,
+									formatter.format(fromDate) + " - " + formatter.format(toDate));
+						} else {
+							if (workbook.getNumberOfSheets() != 0) {
+
+								// System.out.println("Still open4");
+								ResultSet topAcc = dataProvider.getTopAccountNumber(String.valueOf(prevACChier));
+
+								if (topAcc.next()) {
+									if (topAcc.getString(1) == null) // if account don`t have acc_number
+										fileName = topAcc.getString(3); // use acc_name instead
+									else
+										fileName = topAcc.getString(1);
+								}
+
+								// Save file [path]/[acc_number or acc_name]_[From date_ to today][(Type of
+								// report)]
+								System.out.println(fileName);
+								fileOut = new FileOutputStream(
+										saveDirectory + "/" + fileName + "_" + formatter.format(fromDate)
+												+ "-" + formatter.format(toDate) + "(" + reportName + ").xls");
+
+								workbook.write(fileOut);
+								fileOut.close();
+							}
+
+							workbook = new HSSFWorkbook();
+							// System.out.println("Still open5");
+							ArrayList<Interest> accData = report.getReport(accountsForReport.getString(2),
+									fromDate, toDate);
+							if (accData.size() == 0)
+								continue;
+							saveACC(workbook, accData, accNumber, reportName,
+									formatter.format(fromDate) + " - " + formatter.format(toDate));
+
+						}
+						prevACChier = accountsForReport.getInt(1);
+
+					}
+
+				}
+				server.endConn(connection);
+				System.out.println("Count: " + currACCcounter);
+			}
+		} catch (SQLException ex) {
+			System.err.println("SQLException information");
+			while (ex != null) {
+				System.err.println("Error msg: " + ex.getMessage());
+				System.err.println("SQLSTATE: " + ex.getSQLState());
+				System.err.println("Error code: " + ex.getErrorCode());
+
+				ex.printStackTrace();
+				ex = ex.getNextException(); // For drivers that support chained exceptions
+			}
+		} catch (IOException ex) {
+			System.err.println("IOException information");
+			while (ex != null) {
+				System.err.println("Error msg: " + ex.getMessage());
+
+			}
+		}
+	}
+	
+	
+	
 	public void monthlyEntries(String date) {
 		System.out.println("--------------Monthly-------------");
 
@@ -404,7 +899,7 @@ public class ExcelSaveData {
 		int prevACChier = -1;
 		int currACCcounter = 0;
 		boolean outOfACC = false;
-
+		String fileName = null;
 		try {
 			while (!outOfACC) {
 				connection = server.openConn();
@@ -444,33 +939,44 @@ public class ExcelSaveData {
 									dateFormat.format(accountsForMonthlyReport.getDate(6)) + " - "
 											+ formatter.format(LocalDate.now().minusDays(1)));
 
+							ResultSet topAcc = dataProvider.getTopAccountNumber(accountsForMonthlyReport.getString(1));
+
+							if (topAcc.next()) {
+								if (topAcc.getString(1) == null) // if account don`t have acc_number
+									fileName = topAcc.getString(3); // use acc_name instead
+								else
+									fileName = topAcc.getString(1);
+							}
 							prevACChier = accountsForMonthlyReport.getInt(1);
 						} else { // create new file for other hierarchy
 							// Save previous file
 							System.out.println("**** " + accNumber);
 							if (workbook.getNumberOfSheets() != 0) {
 
-								ResultSet topAcc = dataProvider
-										.getTopAccountNumber(accountsForMonthlyReport.getString(1));
+								if (fileName == null) {
+									ResultSet topAcc = dataProvider
+											.getTopAccountNumber(accountsForMonthlyReport.getString(1));
 
-								if (topAcc.next()) {
-									String fileName;
-									if (topAcc.getString(1) == null) // if account don`t have acc_number
-										fileName = topAcc.getString(3); // use acc_name instead
-									else
-										fileName = topAcc.getString(1);
-
-									// Save file [path]/[acc_number or acc_name]_[From date_ to today][(Type of
-									// report)]
-									fileOut = new FileOutputStream(folderForMonthlyRepotrs + "/" + fileName + "_"
-											+ dateFormat.format(accountsForMonthlyReport.getDate(6)) + "-"
-											+ formatter.format(LocalDate.now().minusDays(1)) + "(" + reportName + ").xls");
-
-									workbook.write(fileOut);
+									if (topAcc.next()) {
+										if (topAcc.getString(1) == null) // if account don`t have acc_number
+											fileName = topAcc.getString(3); // use acc_name instead
+										else
+											fileName = topAcc.getString(1);
+									}
 								}
+
+								// Save file [path]/[acc_number or acc_name]_[From date_ to today][(Type of
+								// report)]
+								System.out.println(fileName);
+								fileOut = new FileOutputStream(folderForMonthlyRepotrs + "/" + fileName + "_"
+										+ dateFormat.format(accountsForMonthlyReport.getDate(6)) + "-"
+										+ formatter.format(LocalDate.now().minusDays(1)) + "(" + reportName + ").xls");
+
+								workbook.write(fileOut);
+								fileName = null;
 								fileOut.close();
 							}
-
+							fileName = null;
 							// Create new file
 							workbook = new HSSFWorkbook();
 
@@ -522,16 +1028,44 @@ public class ExcelSaveData {
 		}
 	}
 
+	private ResultSet getSettlement(String account) {
+		ResultSet settlement = null;
+
+		while (account != null) {
+			settlement = dataProvider.getSettlementAcc(account);
+			try {
+				if (settlement.next()) {
+					return settlement;
+				} else {
+					ResultSet parent = dataProvider.getParent(account);
+					if (parent.next()) {
+						account = parent.getString(0);
+					} else {
+						settlement = null;
+						account = null;
+					}
+				}
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		return settlement;
+	}
+
 	private String getMoney(String value, String Currency) { // Convert to Interest Bearing Balance 123456 => 1234,56
-																// EUR
-		StringBuffer buffer = new StringBuffer(value);
-		if (buffer.length() > 2)
-			buffer.insert(value.length() - 2, ",");
-		else if (buffer.length() == 2)
-			buffer.insert(0, "0,");
-		else if (buffer.length() == 1)
-			buffer.insert(0, "0,0");
-		buffer.insert(buffer.length(), " " + Currency);
+		StringBuffer buffer = new StringBuffer(value); // EUR
+		if (Currency == "JPY") {
+			buffer.insert(buffer.length(), " " + Currency);
+		} else {
+			if (buffer.length() > 2)
+				buffer.insert(value.length() - 2, ",");
+			else if (buffer.length() == 2)
+				buffer.insert(0, "0,");
+			else if (buffer.length() == 1)
+				buffer.insert(0, "0,0");
+			buffer.insert(buffer.length(), " " + Currency);
+		}
 		return buffer.toString();
 	}
 
