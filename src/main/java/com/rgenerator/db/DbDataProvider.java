@@ -61,7 +61,7 @@ public class DbDataProvider {
 				"	ard.CALCU_TO_DATE ASC");
 	}
 	
-	public ResultSet findDetailsData(String account, String date) {
+	public ResultSet findDetailsData(String account) {
 		return dataProvider("SELECT\r\n" + 
 				"	ard.ACC_ID AS \"Account number\",\r\n" + 
 				"	a.ACC_NAME AS \"Account Name\",\r\n" + 
@@ -80,7 +80,6 @@ public class DbDataProvider {
 				"	a.ACC_ID = ard.ACC_ID\r\n" + 
 				"WHERE\r\n" + 
 				"	ard.ACC_ID = "+account+"\r\n" + 
-				"   AND ard.CALCU_TO_DATE < '"+date+"'\r\n"+
 				"	AND ard.CALCU_TYPE = 'INT'\r\n" + 
 				"ORDER BY\r\n" + 
 				"	ard.CALCU_TO_DATE DESC\r\n"+
@@ -89,86 +88,46 @@ public class DbDataProvider {
 	
 	
 	
-	public ResultSet weeklyEntriesData(String date, int startFrom) {
-		return dataProvider(
-				"-- Weekly\r\n" + 
-				"SELECT \r\n" + 
+	public ResultSet weeklyEntriesData(String account, String date) {
+		return dataProvider("SELECT \r\n" + 
 				"       e.HIER_ID -- group into workbook files by HIER_ID\r\n" + 
 				"     , ar.ACC_ID -- split into worksheets by ACC_ID\r\n" + 
-				"     , ar.RESUL_TO_DATE\r\n" + 
-				"     , ar.FUNCTION_ID, ar.COND_CODE\r\n" + 
-				"     , date('"+date+"') + CASE DAYOFWEEK(date('"+date+"')) WHEN 1 THEN -6 ELSE - DAYOFWEEK(date('"+date+"')) + 2 END DAYS AS details_from\r\n" + 
-				"     , date('"+date+"') + CASE DAYOFWEEK(date('"+date+"')) WHEN 1 THEN 0 ELSE 8 - DAYOFWEEK(date('"+date+"')) END DAYS AS details_to\r\n" + 
+				"     , ar.RESUL_FROM_DATE\r\n" + 
+				"     , ar.RESUL_TO_DATE\r\n" +  
 				"  FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
-				"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND date('"+date+"') BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
-				"--INNER JOIN ACCOUNT a ON a.ACC_ID = ar.ACC_ID\r\n" + 
-				"--LEFT OUTER JOIN TERMCOND_FUNCTION fa ON fa.FUNCTION_ID = ar.FUNCTION_ID AND fa.COND_CODE = ar.COND_CODE AND fa.BANK_ID = a.BANK_ID\r\n" + 
-				"WHERE -- criteria to select records that need to be reported :today\r\n" + 
-				"      date('"+date+"') BETWEEN ar.RESUL_FROM_DATE AND ar.RESUL_TO_DATE\r\n" + 
-				"  AND DAYOFWEEK(date('"+date+"')) = 1 -- Sunday\r\n" + 
-				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n" + 
-				"LIMIT 300 OFFSET " + (startFrom));
-	}
-	
-	public ResultSet getEntriesData(int reportType, String date, int startFrom) {
-		ResultSet set=null;
-		if(reportType==1) {//Daily
-			
-		}else if(reportType==2) {//Weekly
-			set = dataProvider(
-					"-- Weekly\r\n" + 
-							"SELECT \r\n" + 
-							"       e.HIER_ID -- group into workbook files by HIER_ID\r\n" + 
-							"     , ar.ACC_ID -- split into worksheets by ACC_ID\r\n" + 
-							"     , ar.RESUL_TO_DATE\r\n" + 
-							"     , ar.FUNCTION_ID, ar.COND_CODE\r\n" + 
-							"     , date('"+date+"') + CASE DAYOFWEEK(date('"+date+"')) WHEN 1 THEN -6 ELSE - DAYOFWEEK(date('"+date+"')) + 2 END DAYS AS details_from\r\n" + 
-							"     , date('"+date+"') + CASE DAYOFWEEK(date('"+date+"')) WHEN 1 THEN 0 ELSE 8 - DAYOFWEEK(date('"+date+"')) END DAYS AS details_to\r\n" + 
-							"  FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
-							"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND date('"+date+"') BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
-							"--INNER JOIN ACCOUNT a ON a.ACC_ID = ar.ACC_ID\r\n" + 
-							"--LEFT OUTER JOIN TERMCOND_FUNCTION fa ON fa.FUNCTION_ID = ar.FUNCTION_ID AND fa.COND_CODE = ar.COND_CODE AND fa.BANK_ID = a.BANK_ID\r\n" + 
-							"WHERE -- criteria to select records that need to be reported :today\r\n" + 
-							"      date('"+date+"') BETWEEN ar.RESUL_FROM_DATE AND ar.RESUL_TO_DATE\r\n" + 
-							"  AND DAYOFWEEK(date('"+date+"')) = 1 -- Sunday\r\n" + 
-							"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n" + 
-							"LIMIT 300 OFFSET " + (startFrom));
-		}else if(reportType==3) {//Monthly
-			set = dataProvider("-- Monthly\r\n" + 
-					"-- for each row of this resultset\r\n" + 
-					"SELECT \r\n" + 
-					"       e.HIER_ID -- group into workbook files by HIER_ID\r\n" + 
-					"     , ar.ACC_ID -- split into worksheets by ACC_ID\r\n" + 
-					"     , ar.RESUL_TO_DATE\r\n" + 
-					"     , ar.FUNCTION_ID, ar.COND_CODE\r\n" + 
-					"     , date(TO_DATE(TO_CHAR(YEAR('"+date+"'),'0000')||'-'||TO_CHAR(MONTH('"+date+"'),'00')||'-01', 'YYYY-MM-DD')) AS details_from\r\n" + 
-					"     , date(TO_DATE(TO_CHAR(YEAR('"+date+"') + CASE MONTH('"+date+"') WHEN 12 THEN 1 ELSE 0 END,'0000')||'-'||TO_CHAR(MONTH('"+date+"') + CASE MONTH('"+date+"') WHEN 12 THEN -11 ELSE 1 END,'00')||'-01', 'YYYY-MM-DD') - 1 DAY) AS details_to\r\n" + 
-					"FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
-					"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND '"+date+"' BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
-					"WHERE 1=0\r\n" + 
-					"    -- criteria to select records that need to be reported :today\r\n" + 
-					"    OR ar.RESUL_TO_DATE = '"+date+"'\r\n" + 
-					"    OR YEAR(ar.RESUL_TO_DATE) > YEAR('"+date+"')\r\n" + 
-					"    OR YEAR(ar.RESUL_TO_DATE) = YEAR('"+date+"') AND MONTH(ar.RESUL_TO_DATE) > MONTH('"+date+"')\r\n" + 
-					"    --\r\n" + 
-					"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n" +
-					"LIMIT 300 OFFSET " + (startFrom));
-		}
-		return set;
+				"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND '"+date+"' BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
+				"WHERE ar.ACC_ID = "+account+" AND \r\n" + 
+				"      '"+date+"' BETWEEN ar.RESUL_FROM_DATE AND ar.RESUL_TO_DATE\r\n" + 
+				"  AND DAYOFWEEK('"+date+"') = 1 -- Sunday\r\n" + 
+				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE");
 	}
 	
 	
-	public ResultSet monthlyEntriesData(String date, int startFrom) {
+	
+	public ResultSet monthlyEntriesData(String account, String date) {
 		return dataProvider("-- Monthly\r\n" + 
 				"-- for each row of this resultset\r\n" + 
 				"SELECT \r\n" + 
 				"       e.HIER_ID -- group into workbook files by HIER_ID\r\n" + 
 				"     , ar.ACC_ID -- split into worksheets by ACC_ID\r\n" + 
+				"     , ar.RESUL_FROM_DATE\r\n" +
 				"     , ar.RESUL_TO_DATE\r\n" + 
 				"     , ar.FUNCTION_ID, ar.COND_CODE\r\n" + 
-				"     , date(TO_DATE(TO_CHAR(YEAR('"+date+"'),'0000')||'-'||TO_CHAR(MONTH('"+date+"'),'00')||'-01', 'YYYY-MM-DD')) AS details_from\r\n" + 
-				"     , date(TO_DATE(TO_CHAR(YEAR('"+date+"') + CASE MONTH('"+date+"') WHEN 12 THEN 1 ELSE 0 END,'0000')||'-'||TO_CHAR(MONTH('"+date+"') + CASE MONTH('"+date+"') WHEN 12 THEN -11 ELSE 1 END,'00')||'-01', 'YYYY-MM-DD') - 1 DAY) AS details_to\r\n" + 
 				"FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
+				"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND '"+date+"' BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
+				"WHERE ar.ACC_ID="+account+" AND (\r\n" + 
+				"    -- criteria to select records that need to be reported :today\r\n" + 
+				"    ar.RESUL_TO_DATE = '"+date+"'\r\n" + 
+				"    OR YEAR(ar.RESUL_TO_DATE) > YEAR('"+date+"')\r\n" + 
+				"    OR YEAR(ar.RESUL_TO_DATE) = YEAR('"+date+"') AND MONTH(ar.RESUL_TO_DATE) > MONTH('"+date+"'))\r\n" + 
+				"    --\r\n" + 
+				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n");
+	}
+	
+	public ResultSet getMonthlyHierarchies(String date) {
+		return dataProvider("SELECT DISTINCT\r\n" + 
+				"       e.HIER_ID \r\n" + 
+				"     FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
 				"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND '"+date+"' BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
 				"WHERE 1=0\r\n" + 
 				"    -- criteria to select records that need to be reported :today\r\n" + 
@@ -176,8 +135,18 @@ public class DbDataProvider {
 				"    OR YEAR(ar.RESUL_TO_DATE) > YEAR('"+date+"')\r\n" + 
 				"    OR YEAR(ar.RESUL_TO_DATE) = YEAR('"+date+"') AND MONTH(ar.RESUL_TO_DATE) > MONTH('"+date+"')\r\n" + 
 				"    --\r\n" + 
-				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n" +
-				"LIMIT 300 OFFSET " + (startFrom));
+				"ORDER BY e.HIER_ID");
+	}
+	
+	public ResultSet getWeeklyHierarchies(String date) {
+		return dataProvider("SELECT DISTINCT\r\n" + 
+				"       e.HIER_ID -- group into workbook files by HIER_ID\r\n" + 
+				"     FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
+				"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND date('"+date+"') BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
+				"WHERE \r\n" + 
+				"      date('"+date+"') BETWEEN ar.RESUL_FROM_DATE AND ar.RESUL_TO_DATE\r\n" + 
+				"  AND DAYOFWEEK(date('"+date+"')) = 1 -- Sunday\r\n" + 
+				"ORDER BY e.HIER_ID");
 	}
 	
 	public ResultSet getHierarchy(String account) {
@@ -239,6 +208,25 @@ public class DbDataProvider {
 				"--\r\n" + 
 				" FROM CUST.CUSTOMER cu WHERE cu.CUST_ID = "+customer);
 	}
+	
+	public ResultSet getAllAggrAccInHierarchy(String date, String hierarchiID) {
+        return dataProvider("SELECT\r\n" + 
+                     "e.PARENT_ACC_ID,\r\n" + 
+                      "a.ACC_ID,\r\n" + 
+                     "aat.ACCTYPE_CATEGORY,\r\n" + 
+                     "e.FROM_DATE,\r\n" + 
+                     "e.TO_DATE,\r\n" + 
+                     "a.ACC_NAME,\r\n" + 
+                     "a.ACC_NUMBER\r\n" + 
+                     "FROM ACCT.EDGE e\r\n" + 
+                     "INNER JOIN ACCT.ACCOUNT_ACCOUNTTYPE aat ON aat.ACC_ID = e.CHILD_ACC_ID\r\n" + 
+                     "INNER JOIN ACCT.ACCOUNT a ON a.ACC_ID = e.CHILD_ACC_ID\r\n" + 
+                     "WHERE e.HIER_ID = " + hierarchiID +"\r\n" + 
+                     "AND '" + date + "' BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
+                     "ORDER BY e.PARENT_ACC_ID DESC");
+	}
+
+
 	
 	private ResultSet dataProvider(String qwery) {
 		ResultSet rs = null;

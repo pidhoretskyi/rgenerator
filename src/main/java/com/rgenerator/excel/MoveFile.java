@@ -1,21 +1,23 @@
 package com.rgenerator.excel;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+
+import java.net.URL;
+import java.security.CodeSource;
 import java.util.Properties;
 
 
-import com.rgenerator.db.DbConnProvider;
+
 
 public class MoveFile {
 
-	private String fileName = "META-INF/application.properties";
-	private InputStream inputStream = DbConnProvider.class.getClassLoader().getResourceAsStream(fileName);
-	private Properties properties = new Properties();
+	private FileInputStream inputStream;
 
 	String windowsDirectory = "";
 	String unixDirectory = "";
+
 
 	public String createFolder(String foldername, String rootDir) {
 
@@ -27,11 +29,16 @@ public class MoveFile {
 
 	public String createDirectory() {
 
+		Properties properties = new Properties();
 		try {
-			inputStream = DbConnProvider.class.getClassLoader().getResourceAsStream(fileName);
+			CodeSource codeSource = getClass().getProtectionDomain().getCodeSource();
+			URL url = null;
+			if (codeSource != null) {
+				url = new URL(codeSource.getLocation(), "conf/reportgenerator.properties");
+			}
+			inputStream = new FileInputStream(url.getFile());
 			if (inputStream == null) {
-				System.out.println("Sorry, unable to find " + fileName);
-//				return;
+				System.out.println("Sorry, unable to find ");
 			}
 			properties.load(inputStream);
 			windowsDirectory = properties.getProperty("windowsDirectory");
@@ -64,5 +71,4 @@ public class MoveFile {
 
 		return reportFolder.toString();
 	}
-
 }

@@ -1,21 +1,19 @@
 package com.rgenerator.db;
 
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.URL;
+import java.security.CodeSource;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
-import java.util.Scanner;
 
 import com.ibm.db2.jcc.am.Connection;
 
 public class DbConnProvider {
 
-	private static final String fileName = "META-INF/application.properties";
-
-	private static Scanner scanner = new Scanner(System.in);
 	public static Properties properties = new Properties();
-	public static InputStream inputStream = DbConnProvider.class.getClassLoader().getResourceAsStream(fileName);
+	public static FileInputStream inputStream;
 
 	private String URL;
 	private String USER;
@@ -36,10 +34,14 @@ public class DbConnProvider {
 	public void connectionToFirstDB() {
 
 		try {
-			inputStream = DbConnProvider.class.getClassLoader().getResourceAsStream(fileName);
+			CodeSource codeSource = getClass().getProtectionDomain().getCodeSource();
+			URL url = null;
+			if (codeSource != null) {
+				url = new URL(codeSource.getLocation(), "conf/reportgenerator.properties");
+			}
+			inputStream = new FileInputStream(url.getFile());
 			if (inputStream == null) {
-				System.out.println("Sorry, unable to find " + fileName);
-				return;
+				System.out.println("Sorry, unable to find ");
 			}
 			properties.load(inputStream);
 
@@ -47,11 +49,11 @@ public class DbConnProvider {
 			DB_NAME = properties.getProperty("dbNameForFirstConn");
 			URL = properties.getProperty("dbUrlForFirstConn");
 			USER = properties.getProperty("dbUserForFirstConn");
-			//System.out.println("ENTER PASSWORD for " + DB_NAME );
-			PASSWORD = "15Asennu51";//scanner.next();
-//			PASSWORD = properties.getProperty("dbPassForFirstConn");
+
+			PASSWORD = properties.getProperty("dbPassForFirstConn");
 			PORT = properties.getProperty("dbPortForFirstConn");
 
+			// Save new URL
 			URL = URL + ":" + PORT + "/" + DB_NAME;
 			new DbConnProvider(URL, USER, PASSWORD);
 			inputStream.close();
@@ -63,10 +65,14 @@ public class DbConnProvider {
 	public void connectionToSecondtDB() {
 
 		try {
-			inputStream = DbConnProvider.class.getClassLoader().getResourceAsStream(fileName);
+			CodeSource codeSource = getClass().getProtectionDomain().getCodeSource();
+			URL url = null;
+			if (codeSource != null) {
+				url = new URL(codeSource.getLocation(), "conf/reportgenerator.properties");
+			}
+			inputStream = new FileInputStream(url.getFile());
 			if (inputStream == null) {
-				System.out.println("Sorry, unable to find " + fileName);
-				return;
+				System.out.println("Sorry, unable to find ");
 			}
 			properties.load(inputStream);
 
@@ -74,11 +80,11 @@ public class DbConnProvider {
 			DB_NAME = properties.getProperty("dbNameForSecondConn");
 			URL = properties.getProperty("dbUrlForSecondConn");
 			USER = properties.getProperty("dbUserForSecondConn");
-			//System.out.println("ENTER PASSWORD for " + DB_NAME );
-			PASSWORD = "15Asennu51";//scanner.next();
-//			PASSWORD = properties.getProperty("dbPassForFirstConn");
+
+			PASSWORD = properties.getProperty("dbPassForSecondConn");
 			PORT = properties.getProperty("dbPortForSecondConn");
 
+			// Save new URL
 			URL = URL + ":" + PORT + "/" + DB_NAME;
 			new DbConnProvider(URL, USER, PASSWORD);
 			inputStream.close();
@@ -87,7 +93,6 @@ public class DbConnProvider {
 		}
 	}
 
-	
 	public Connection openConn() {
 		Connection connection = null;
 		try {
