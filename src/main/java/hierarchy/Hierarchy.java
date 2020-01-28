@@ -49,6 +49,7 @@ public class Hierarchy {
 	private String directoryName;
 	private String folderForMonthlyRepotrs;
 	private String folderForWeeklyRepotrs;
+	private String folderForQuarterReports;
 	private String saveFolder;
 
 	private int reportType;
@@ -58,6 +59,7 @@ public class Hierarchy {
 		String directoryName = moveFile.createDirectory();
 		folderForMonthlyRepotrs = moveFile.createFolder("MONTHLY", directoryName);
 		folderForWeeklyRepotrs = moveFile.createFolder("WEEKLY", directoryName);
+		folderForQuarterReports = moveFile.createFolder("QUARTER", directoryName);
 
 	}
 
@@ -103,9 +105,12 @@ public class Hierarchy {
 		if (reportType == 1) {// Weekly
 			this.reportName = "Weekly";
 			saveFolder = folderForWeeklyRepotrs;
-		} else {// Monthly
+		} else if (reportType == 2) {// Monthly
 			this.reportName = "Monthly";
 			saveFolder = folderForMonthlyRepotrs;
+		} else { // Quarter
+			this.reportName = "Quarterly";
+			saveFolder = folderForQuarterReports;
 		}
 		formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 		server = new DbConnProvider();
@@ -193,8 +198,11 @@ public class Hierarchy {
 			ResultSet acc_result;
 			if (reportType == 1)
 				acc_result = dataProvider.weeklyEntriesData(accID, to.toString());
-			else
+			else if (reportType == 2)
 				acc_result = dataProvider.monthlyEntriesData(accID, to.toString());
+			else
+				acc_result = dataProvider.quarterEntriesData(accID, from.toString(), to.toString());
+
 			if (acc_result.next()) {
 				if (acc_result.getString(3).compareTo(toDate.toString()) > 0) {
 					return new ArrayList<Interest>(); // no interest were found
@@ -208,6 +216,14 @@ public class Hierarchy {
 				}
 			} else
 				return new ArrayList<Interest>();
+			if (reportType == 3) {
+				to = Date.valueOf(acc_result.getString(4)).toLocalDate();
+				while (acc_result.next()) {
+					if (acc_result.getString(4).compareTo(to.toString()) > 0) {
+						from = Date.valueOf(acc_result.getString(3)).toLocalDate();
+					}
+				}
+			}
 
 		} catch (SQLException ex) {
 			System.err.println("SQLException information");
@@ -228,8 +244,7 @@ public class Hierarchy {
 
 		Sheet sheet = workbook.createSheet(ACCname);
 		// Create header information
-		String reportPeriod = formatter.format(ACCdata.get(0).getToDate().toLocalDate()) + " - "
-				+ formatter.format(ACCdata.get(ACCdata.size() - 1).getToDate().toLocalDate());
+		String reportPeriod = formatter.format(fromDate) + " - " + formatter.format(toDate);
 
 		Row rowReportName = sheet.createRow(0);
 		Row rowReportPeriod = sheet.createRow(1);

@@ -48,7 +48,8 @@ public class DbDataProvider {
 				"	ard.CALCU_CONSUMED_AMOUNT AS \"Interest Bearing Balance\",\r\n" + 
 				"	ard.CALCU_RATE_PERCENT AS \"Total Interest Rate (%)\",\r\n" + 
 				"	ard.FCOND_NAME AS \"Interest Basis\",\r\n" + 
-				"	ard.SETTLEMENT_TYPE AS \"Settlement type\"\r\n" + 
+				"	ard.SETTLEMENT_TYPE AS \"Settlement type\",\r\n" + 
+				"   ard.FUNCTION_ID\r\n" +
 				"FROM\r\n" + 
 				"	ACCT.ACCOUNT_RESULT_DETAILS ard\r\n" + 
 				"INNER JOIN ACCT.ACCOUNT a ON\r\n" + 
@@ -124,6 +125,22 @@ public class DbDataProvider {
 				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n");
 	}
 	
+	public ResultSet quarterEntriesData(String account, String from, String to) {
+		return dataProvider("-- Monthly\r\n" + 
+				"-- for each row of this resultset\r\n" + 
+				"SELECT \r\n" + 
+				"       e.HIER_ID -- group into workbook files by HIER_ID\r\n" + 
+				"     , ar.ACC_ID -- split into worksheets by ACC_ID\r\n" + 
+				"     , ar.RESUL_FROM_DATE\r\n" +
+				"     , ar.RESUL_TO_DATE\r\n" + 
+				"     , ar.FUNCTION_ID, ar.COND_CODE\r\n" + 
+				"FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
+				"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND '"+to+"' BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
+				"WHERE ar.ACC_ID="+account+" AND \r\n" + 
+				"ar.RESUL_TO_DATE BETWEEN '"+from+"' AND '"+to+"' \r\n"+
+				"ORDER BY e.HIER_ID, ar.ACC_ID, ar.RESUL_FROM_DATE\r\n");
+	}
+	
 	public ResultSet getMonthlyHierarchies(String date) {
 		return dataProvider("SELECT DISTINCT\r\n" + 
 				"       e.HIER_ID \r\n" + 
@@ -146,6 +163,16 @@ public class DbDataProvider {
 				"WHERE \r\n" + 
 				"      date('"+date+"') BETWEEN ar.RESUL_FROM_DATE AND ar.RESUL_TO_DATE\r\n" + 
 				"  AND DAYOFWEEK(date('"+date+"')) = 1 -- Sunday\r\n" + 
+				"ORDER BY e.HIER_ID");
+	}
+	
+	public ResultSet getQuarterHierarchies(String from, String to) {
+		return dataProvider("SELECT DISTINCT\r\n" + 
+				"       e.HIER_ID \r\n" + 
+				"     FROM ACCT.ACCOUNT_RESULT ar\r\n" + 
+				"INNER JOIN ACCT.EDGE e ON e.CHILD_ACC_ID = ar.ACC_ID AND date('"+to+"') BETWEEN e.FROM_DATE AND e.TO_DATE\r\n" + 
+				"WHERE \r\n" + 
+				"	ar.RESUL_TO_DATE BETWEEN date('"+from+"') AND date('"+to+"')\r\n" + 
 				"ORDER BY e.HIER_ID");
 	}
 	

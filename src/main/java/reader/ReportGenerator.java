@@ -107,7 +107,6 @@ public class ReportGenerator {
 		return colum_settleType;
 	}
 
-
 	private String getOwner(String account) throws SQLException {
 		ResultSet owner = dataProviderACCT.getOwner(account);
 		ResultSet ownerName;
@@ -139,8 +138,7 @@ public class ReportGenerator {
 		ArrayList<Interest> result = new ArrayList<Interest>();
 		String currency = "";
 		try {
-			
-			
+
 			String ownerName = getOwner(account);
 			ResultSet settlement;
 			while (true) {
@@ -176,13 +174,16 @@ public class ReportGenerator {
 				record.setCalcuNum(data.getInt(5));
 				record.setToDate(data.getDate(6));
 				record.setCurrency(currency);
-				if (data.getInt(7) < 0) {
+				System.out.println(data.getString(12));
+				if (data.getString(12).equals("BCRB1")) {
+					
 					if (currency == "JPY")
 						record.setInterestCredit(Double.valueOf(data.getInt(7)) / 100);
 					else
 						record.setInterestCredit(Double.valueOf(data.getInt(7)) / 10000);
 					record.setInterestDebit(0);
-				} else if (data.getInt(7) > 0) {
+				} else if (data.getString(12).equals("BDEB1") || data.getString(12).equals("CRED1")
+						|| data.getString(12).equals("BUOD1")) {
 					if (currency == "JPY")
 						record.setInterestDebit(Double.valueOf(data.getInt(7)) / 100);
 					else
@@ -232,7 +233,7 @@ public class ReportGenerator {
 		ArrayList<Interest> dayrecords = new ArrayList<Interest>();
 
 		for (int i = 0; i < full.size(); i++) {
-			if (full.get(i).getToDate().toString().equals(date.toString()) ) {
+			if (full.get(i).getToDate().toString().equals(date.toString())) {
 				dayrecords.add((Interest) full.get(i).clone());
 			}
 		}
@@ -349,8 +350,6 @@ public class ReportGenerator {
 				}
 				fromDate = fromDate.plusDays(1);// next day
 			}
-
-			
 
 		} catch (NullPointerException ex) {
 			System.err.println("Error msg: " + ex.getMessage());

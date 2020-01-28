@@ -77,6 +77,35 @@ public class ExcelSaveData {
 		}
 		server.endConn(connection);
 	}
+	
+	
+	public void startQuarterReporting(LocalDate fromDate, LocalDate toDate) {
+		server = new DbConnProvider();
+		server.connectionToFirstDB();
+		connection = server.openConn();
+		dataProvider = new DbDataProvider(connection);
+		if(connection!=null) {
+			ResultSet quarterHier = dataProvider.getQuarterHierarchies(fromDate.toString(), toDate.toString());
+			Hierarchy quarter = new Hierarchy();
+			try {
+				while(quarterHier.next()) {
+					quarter.getHierarchyReport(quarterHier.getString(1), fromDate, toDate, 3);
+				}
+			} catch (SQLException ex) {
+				System.err.println("SQLException information");
+				while (ex != null) {
+					System.err.println("Error msg: " + ex.getMessage());
+					System.err.println("SQLSTATE: " + ex.getSQLState());
+					System.err.println("Error code: " + ex.getErrorCode());
+
+					ex.printStackTrace();
+					ex = ex.getNextException(); // For drivers that support chained exceptions
+				}
+			}
+		}
+		server.endConn(connection);
+		
+	}
 
 	
 
